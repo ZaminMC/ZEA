@@ -41,6 +41,16 @@ public final class ZeaConfig extends Config {
         public static final int MIN_AUTO_RESPONSE_COOLDOWN_SECONDS = 10;
         public static final int MAX_AUTO_RESPONSE_COOLDOWN_SECONDS = 300;
 
+        /** Inventory buttons beside container GUIs. */
+        public static final class InventoryButtons {
+                @ConfigOption(name = "Inventory buttons", desc = "Show your custom buttons beside "
+                                + "inventory and chest screens on EarthMC. Buttons run the command "
+                                + "you configured when clicked.")
+                @ConfigEditorBoolean
+                @ConfigOrder(0)
+                public boolean enabled = true;
+        }
+
         /** Chat options. */
         public static final class Chat {
                 @ConfigOption(name = "Multi-channel sending", desc = "Allow sending one message to several "
@@ -201,6 +211,10 @@ public final class ZeaConfig extends Config {
         @ConfigOrder(4)
         public Mentions mentions = new Mentions();
 
+        @Category(name = "Inventory buttons", desc = "Custom buttons beside container screens.")
+        @ConfigOrder(5)
+        public InventoryButtons inventoryButtons = new InventoryButtons();
+
         /** Set by the store so the MoulConfig editor's saves go through safe-write. */
         private transient Runnable saveAction;
 
@@ -306,6 +320,11 @@ public final class ZeaConfig extends Config {
         public long autoResponseCooldownMillis() {
                 return Math.clamp(mentions.autoResponseCooldownSeconds,
                                 MIN_AUTO_RESPONSE_COOLDOWN_SECONDS, MAX_AUTO_RESPONSE_COOLDOWN_SECONDS) * 1000L;
+        }
+
+        /** Whether inventory buttons render; on by default (they do nothing until configured). */
+        public boolean inventoryButtonsEnabled() {
+                return inventoryButtons.enabled;
         }
 
         /** The schema version this instance was loaded from (or wrote). */

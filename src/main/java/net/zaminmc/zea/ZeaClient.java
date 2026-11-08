@@ -2,6 +2,7 @@ package net.zaminmc.zea;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.loader.api.FabricLoader;
+import net.zaminmc.zea.buttons.InventoryButtons;
 import net.zaminmc.zea.chat.ChatSubsystem;
 import net.zaminmc.zea.chat.classify.ClassificationPipeline;
 import net.zaminmc.zea.config.ZeaConfig;
@@ -23,6 +24,7 @@ public final class ZeaClient implements ClientModInitializer {
 
         private static ClientLifecycle lifecycle;
         private static ChatSubsystem chat;
+        private static InventoryButtons inventoryButtons;
         private static ZeaConfig config;
 
         public static ClientLifecycle lifecycle() {
@@ -31,6 +33,10 @@ public final class ZeaClient implements ClientModInitializer {
 
         public static ChatSubsystem chat() {
                 return chat;
+        }
+
+        public static InventoryButtons inventoryButtons() {
+                return inventoryButtons;
         }
 
         public static ZeaConfig config() {
@@ -44,6 +50,8 @@ public final class ZeaClient implements ClientModInitializer {
                 config = new ZeaConfigStore(configFile).load();
                 lifecycle = new ClientLifecycle();
                 chat = new ChatSubsystem(lifecycle, new ClassificationPipeline(), config);
+                inventoryButtons = new InventoryButtons(
+                                FabricLoader.getInstance().getConfigDir().resolve("zea/buttons.json"));
                 ZeaKeys.register();
         }
 }

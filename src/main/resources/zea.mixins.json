@@ -1,12 +1,16 @@
 {
-        "required": true,
-        "minVersion": "0.8",
-        "package": "net.zaminmc.zea.mixin",
-        "compatibilityLevel": "JAVA_25",
-        "client": [
-                "ChatComponentAccessor", "ChatComponentMixin", "ChatScreenMixin", "MentionHighlightMixin"
-        ],
-        "injectors": {
-                "defaultRequire": 1
-        }
+	"required": true,
+	"minVersion": "0.8",
+	"package": "net.zaminmc.zea.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"ChatComponentAccessor",
+		"ChatComponentMixin",
+		"ChatScreenMixin",
+		"MentionHighlightMixin",
+		"ContainerScreenMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	}
 }
