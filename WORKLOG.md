@@ -119,20 +119,41 @@ regardless.
 
 ### Files changed (this session)
 
-- ZEA: `README.md`, `ARCHITECTURE.md`, `ROADMAP.md`, this file,
-  `docs/{DEPENDENCIES,EARTHMC_API,EARTHMC_MESSAGE_FORMATS,TESTING,PASTE_SERVICE}.md`,
-  `LICENSE`, build scaffolding and Stage 1 foundation (see commits).
-- ZEA-REPO: `docs/DESIGN.md`, `README.md`, `manifest.json`, `schemas/`,
-  `datasets/{badges,channels}.json`, `CONTRIBUTING.md`, `scripts/validate.py`,
-  `.github/workflows/validate.yml`.
+ZEA (all on `develop`):
+
+- Documentation: `README.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `WORKLOG.md`,
+  `docs/{DEPENDENCIES,EARTHMC_API,EARTHMC_MESSAGE_FORMATS,TESTING,PASTE_SERVICE}.md`.
+- Licensing: `LICENSE` (LGPL-3.0-or-later, full text).
+- Build: Gradle 9.8.2 wrapper, Loom 1.19 setup, single source set,
+  `fabric.mod.json` (environment client), MoulConfig 4.8.0 via jar-in-jar.
+- Foundation (Stage 1, partial): `ZeaClient` wiring,
+  `lifecycle/ClientLifecycle` (join/leave/stopping events),
+  `earthmc/EarthMcDetector` (address-based detection),
+  `persistence/SafeFileWriter` (atomic replacement),
+  `persistence/JsonStore` (round-trip-verified saves, corruption recovery).
+- Tests: `EarthMcDetectorTest`, `SafeFileWriterTest`, `JsonStoreTest`.
+
+ZEA-REPO (on `main`):
+
+- `docs/DESIGN.md` (the assessment above), `README.md`, `CONTRIBUTING.md`,
+  `manifest.json`, `schemas/` (manifest/badges/channels/nation/town),
+  `datasets/{badges,channels}.json` (seeded with verified observations),
+  `scripts/validate.py`, `.github/workflows/validate.yml`, `.vscode/`.
 
 ### Tests performed
 
-- Build: `./gradlew build` (results recorded per commit in the commit that
-  introduces the change; see below).
-- Unit tests: recorded per commit.
-- In-game testing: **none performed this session.** No claims are made about
-  in-game behavior.
+- Build: `./gradlew build` — **successful** (Java 25, Minecraft 26.3,
+  Loom 1.19). Jar verified to contain `ZeaClient`, expanded
+  `fabric.mod.json` version, `LICENSE_zea`, and the bundled
+  `META-INF/jars/modern-26.3-4.8.0.jar` (MoulConfig).
+- Unit tests: **21 tests, 0 failures** (EarthMcDetector 13,
+  SafeFileWriter 4, JsonStore 4) via JUnit 6.1.3.
+- ZEA-REPO validation: `scripts/validate.py` passes on the seeded data;
+  negative tests confirmed it rejects bad schema versions, missing
+  required fields, stray file locations and stale manifest hashes.
+- In-game testing: **none performed this session.** No claims are made
+  about in-game behavior, MoulConfig runtime initialization, or the
+  EarthMC connection flow beyond what compiles and passes unit tests.
 
 ### Outstanding problems
 

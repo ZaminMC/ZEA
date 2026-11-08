@@ -13,11 +13,19 @@ documentation and the roadmap.
 
 **Deliverable:** reviewed architecture and permanent documentation.
 
-## Stage 1 — Core foundation ⏳
+## Stage 1 — Core foundation ⏳ (in progress)
 
 Clean package boundaries, client lifecycle integration, configuration
 infrastructure (MoulConfig), persistence infrastructure (safe-write
 protocol), event/message-capture boundaries, test infrastructure.
+
+Done: build toolchain (Gradle 9.8.2/Loom 1.19/Java 25, verified compiling),
+MoulConfig 4.8.0 dependency (jar-in-jar), client lifecycle (join/leave/
+stopping), EarthMC detection, safe persistence utilities, JUnit test
+infrastructure (21 passing tests).
+
+Remaining: MoulConfig config classes (as soon as features need options),
+message-capture mixin boundary (with Stage 2).
 
 **Deliverable:** stable, testable foundation.
 
