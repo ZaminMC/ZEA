@@ -77,9 +77,13 @@ ZEA enforces a conservative client-side budget below these limits.
   homeBlock, townBlocks, residents, trusted, outlaws, ranks.
 - Player objects: names/titles, town, nation, timestamps
   (registered/lastOnline), `status.isOnline`, balance, friends, discord ID.
-- Real usernames are available from the API (by name/UUID/Discord ID) — the
-  nickname→username resolution design (Stage 4) should build on this plus
-  chat component data.
+- **Nicknames are not exposed by the API** (verified 2026-11-09 live):
+  player objects carry no nickname field, and lookups by nickname 404 —
+  only real usernames are indexed (observed sample: nickname `Coriolanus`
+  404s, real name `pengpy` resolves). Nickname→username resolution must
+  therefore come from chat component data (hover/click events on the
+  displayed name), pending in-game capture, or not at all; it cannot be
+  built on the API.
 
 ## Unverified / open
 

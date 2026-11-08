@@ -515,3 +515,51 @@ vanilla's own formulas, but no in-game check has happened yet.
   practice land after the glide. Tab bar width with chat scale below 1
   (cosmetic) and writing-channel report on join — unchanged.
 
+---
+
+## 2026-11-09 (session 4, wrap-up) — Key binding, nickname investigation
+
+### Work done
+
+- **Rebindable "toggle chat search" key binding** (`keybind.ZeaKeys`):
+  registered through Fabric's `fabric-key-mapping-api-v1`
+  (`KeyMappingHelper.registerKeyMapping`), under a ZEA category in the
+  vanilla controls screen, unbound by default. `ChatScreenMixin`
+  accepts it alongside Ctrl+F. Verified from the mapped jar: 26.3
+  renamed `InputConstants.Type.KEYSYM` → `KEYBOARD`, `KeyMapping` takes
+  an int key code, `KeyMapping.matches(KeyEvent)` exists, and
+  `KeyMapping.Category.register(Identifier)` is public (label key:
+  `key.category.<namespace>.<path>`).
+- **Why the built-in shortcuts stay fixed**: vanilla key mappings are a
+  single key without modifiers — they cannot express right-click,
+  alt+right-click or Ctrl+F. Rebinding those would need a custom
+  capture UI; recorded as a future option if users ask.
+
+### Research performed
+
+- **Nickname → username resolution, settled against the API** (live
+  probes, 2026-11-09): player objects carry no nickname field; lookup
+  by nickname 404s while the real name resolves (observed sample:
+  `Coriolanus` → 404, `pengpy` → found). The API indexes real names
+  only, so resolution cannot be built on it. Remaining candidate: the
+  chat component tree (hover/click events on the displayed name) —
+  needs in-game captured components. Full player object shape (title,
+  surname, formattedName, about, town, nation, timestamps, status,
+  stats, perms, ranks) recorded for the future player-card work.
+- The simple `GET /v4/players` response is an online-player
+  `{name, uuid}` index (query parameter ignored) — noted for the
+  future API client.
+
+### Tests performed
+
+- `./gradlew build` successful; **171 tests, 0 failures** (no behavior
+  change to test — the binding is registration + a `matches` check).
+- In-game testing: **none.** The controls-screen entry and the
+  keybind-triggered toggle need a live client.
+
+### Outstanding problems
+
+- Stage 4 leftovers (player hover, real-username display) are blocked
+  on in-game component capture; next unblocked work is Stage 5
+  (notifications).
+

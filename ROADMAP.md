@@ -66,11 +66,16 @@ the official `setVisibleMessageFilter` hook (identity-keyed
 classification cache), message copying (right-click plain,
 alt+right-click formatted, legacy serializer, confirmation toast),
 chat search (Ctrl+F, composes with the selected feed, survives resize,
-clears on close/disconnect), and smooth chat (quartic ease-out for new
+clears on close/disconnect), smooth chat (quartic ease-out for new
 messages, wheel/page scrolling and the close-screen reset; configurable
-duration, on by default). Chat dimensions need no ZEA work: vanilla 26.3
-ships width and focused/unfocused height options. Remaining:
-configurable controls, player hover, username option.
+duration, on by default), and a rebindable "toggle chat search" key
+binding (unbound default; the modifier-based shortcuts themselves stay
+fixed — vanilla key mappings cannot express Ctrl+F or right-click).
+Chat dimensions need no ZEA work: vanilla 26.3 ships width and
+focused/unfocused height options. Blocked pending in-game data:
+player hover presentation and the real-username option (EarthMC's API
+does not expose nicknames — resolution depends on the component tree,
+see docs/EARTHMC_API.md).
 
 **Deliverable:** modernized chat interface.
 
