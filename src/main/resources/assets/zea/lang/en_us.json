@@ -3,5 +3,7 @@
         "zea.chat.copy.plain": "Plain text is on the clipboard.",
         "zea.chat.copy.formatted": "Formatted text (with color codes) is on the clipboard.",
         "zea.chat.search": "Search chat",
-        "zea.chat.search.hint": "Search messages…"
+        "zea.chat.search.hint": "Search messages…",
+        "key.category.zea.zea": "ZEA",
+        "zea.key.search_chat": "Toggle chat search"
 }
