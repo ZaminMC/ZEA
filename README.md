@@ -14,6 +14,10 @@ configure it to.
 Early development. See [ROADMAP.md](ROADMAP.md) for the staged plan and
 [WORKLOG.md](WORKLOG.md) for actual progress.
 
+Automated dev builds are published to
+[releases](https://github.com/ZaminMC/ZEA/releases) on every push to
+`develop`.
+
 ## Requirements
 
 | Component | Version |

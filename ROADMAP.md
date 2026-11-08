@@ -101,10 +101,20 @@ mention matching (EarthMC's API does not expose nicknames).
 
 **Deliverable:** reliable notification system.
 
-## Stage 6 — Inventory buttons
+## Stage 6 — Inventory buttons ✅
 
 Button model, rendering, positioning, configuration, editing, safe
 persistence (atomic writes, validation, no command execution on import).
+
+Done: anchored button model with self-sanitizing records, versioned
+store through the safe-write protocol (per-entry tolerance: unusable
+entries dropped, duplicate ids re-issued, corrupt files quarantined),
+rendering and tooltips in all container screens (EarthMC-gated), click
+execution through the single `ButtonActivator` path with per-button
+cooldown, edit mode (keybind-toggled) with drag repositioning, a vanilla
+edit form with inline validation and two-click delete. See
+[docs/INVENTORY_BUTTONS.md](docs/INVENTORY_BUTTONS.md). In-game
+verification pending (bytecode-verified mixins, unit-tested logic).
 
 **Deliverable:** stable inventory-button functionality.
 

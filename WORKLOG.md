@@ -686,3 +686,146 @@ vanilla's own formulas, but no in-game check has happened yet.
 - Stage 4 leftovers (player hover, real-username display) stay blocked
   on in-game component capture. Next unblocked work is Stage 6
   (inventory buttons).
+
+## 2026-11-09 (session 6) — Release pipeline, Stage 6: inventory buttons
+
+### Work done
+
+- **Release pipeline** (`.github/workflows/release.yml`): every push to
+  `develop` cuts the next numbered dev build automatically — compute N
+  over the `vMAJOR.MINOR.PATCH-dev.N` tag ledger, stamp `mod_version` in
+  `gradle.properties`, sync the bump back to develop as an Abasing
+  `[skip ci]` commit before building (loop-breaker), `./gradlew build`
+  (tests included), tag, publish `zea-<version>.jar` as a prerelease
+  with auto-generated notes. Failure safety and escape hatches mirror
+  the ZaminTorch pipeline: no tag/release on build failure, orphan-tag
+  repair path, `[skip ci]` postpones, re-running a published run is a
+  no-op. The `ABASING_TOKEN` repo secret was set so every
+  pipeline-authored commit, tag and release is Abasing, never
+  github-actions[bot]. Verified live: `v0.1.0-dev.1` through `dev.4`
+  published.
+- **Stage 6a — model and store** (`buttons` package): `InventoryButton`
+  (immutable record, self-sanitizing constructor), `ButtonAnchor`
+  (four container corners), `ButtonGeometry` (pure anchor math, hit
+  tests, nearest-corner re-anchoring), `InventoryButtonStore`
+  (versioned `{"version":1,"buttons":[…]}` file through the safe-write
+  protocol; tolerant `ButtonEntry` wire record because Gson rejects
+  explicit nulls on primitive record components — one damaged entry must
+  not quarantine the file; unusable entries dropped with a warning,
+  duplicate ids re-issued).
+- **Stage 6b — rendering**: `ButtonRenderer` (slot-like box: 1px border
+  over dark fill), `ButtonIcons` (cached id→ItemStack, barrier
+  fallback), `ButtonTooltips` (name, command, unknown-icon warning).
+  `ContainerScreenMixin` on `AbstractContainerScreen`: buttons draw at
+  TAIL of `extractContents` (pose popped → screen coordinates), a
+  hovered button cancels `extractTooltip` (HEAD) so slot tooltips never
+  stack. Config category *Inventory buttons* (master toggle, on by
+  default — inert with no buttons). Gated on the EarthMC connection.
+- **Stage 6c — execution**: `ButtonActivator` is the only path from a
+  click to a sent command: re-validates the command (non-blank, ≤256,
+  no control chars — a hand-edited file cannot smuggle a malformed
+  command past the click), 500 ms per-button cooldown (double-click =
+  one command), failed sends don't arm the cooldown, resets on
+  disconnect. Sends via `ClientPacketListener.sendCommand` — the same
+  path as the chat dispatcher. Mouse releases over buttons are consumed
+  so vanilla never treats the area as "outside the GUI" (which would
+  drop a carried item); mid-quick-craft releases pass through.
+- **Stage 6d — editing**: `ButtonDragSession` (grab → preview →
+  re-anchor at nearest corner; 3px jitter threshold so a plain press
+  never repositions), `ButtonEditScreen` (vanilla LinearLayout form:
+  name/command/icon fields, anchor cycler, enabled toggle, Done with
+  inline validation, two-click delete), edit mode toggled by the
+  rebindable *Toggle button editing* key while a container screen is
+  open (Esc leaves edit mode first), a **+** ghost beside the container
+  creates buttons, `InventoryButtons` CRUD (upsert/delete persist
+  immediately through the store).
+- **Docs**: `docs/INVENTORY_BUTTONS.md` (behavior, anchoring, store
+  policy, the no-execution guarantees, mixin target table, limitations).
+
+### Research performed and findings
+
+- **26.3 container screen internals** (decompiled from the mapped jar):
+  `extractRenderState` → `extractContents` (background + slots, pose
+  translated by leftPos/topPos and popped at the end) →
+  `extractCarriedItem` (own stratum) → `extractTooltip`. Injecting at
+  TAIL of `extractContents` draws in screen coordinates below carried
+  items and tooltips.
+- **`mouseClicked`/`mouseReleased` semantics**: the container screen
+  consumes nearly all clicks; releases outside the GUI with a carried
+  item drop it (`slotClicked(null, -999, …, PICKUP)`). Hence the
+  release-consume. `mouseReleased` resets `isQuickCrafting` at its end —
+  cancelling it mid-quick-craft would strand the state, so those
+  releases pass through (shadowed `isQuickCrafting` to check).
+- **`ClientPacketListener.sendCommand`** sends `ServerboundChatCommandPacket`
+  directly (no parse-error popups; `commands.parse` runs only to find
+  signable arguments). `sendUnattendedCommand` exists but opens
+  confirmation windows for parse/permission issues — wrong UX for
+  buttons, which send plugin commands the client tree may not know.
+- **`menu.removed(player)` is a client-side no-op** (server-only logic),
+  so an edit screen can open over a container and return with
+  `gui.setScreen(parent)` without closing the container — the same
+  pattern vanilla's `sendUnattendedCommand` confirmation flow uses.
+- **Gson 2.14 record behavior** (probed): a missing key leaves the
+  component default; an explicit `null` on a primitive component throws
+  `JsonParseException` — which would quarantine the whole buttons file.
+  The `ButtonEntry` wire record (all-nullable boxed fields) isolates
+  this: one weird entry degrades to a dropped button, not a lost set.
+- **26.3 API notes**: `Registry.get(Identifier)` now returns
+  `Optional<Holder.Reference<T>>` (use `getOptional`); `Identifier.tryParse`
+  for null-safe parsing; widgets render through
+  `extractWidgetRenderState`; screens build layouts with
+  `LinearLayout`/`FrameLayout` + `visitWidgets(addRenderableWidget)`
+  (pattern taken from `ConfirmScreen`); `Button.Builder` defaults
+  150×20; `CommonComponents.OPTION_ON`/`optionStatus(boolean)`.
+
+### Design decisions
+
+1. **Anchors relative to the container, not the screen** — buttons keep
+   their place beside the GUI across container sizes (inventory vs
+   chest), matching how NEU positions its buttons conceptually without
+   copying its Hypixel-oriented machinery.
+2. **Offset (0,0) is the flush corner inside the GUI; new buttons use
+   (22, 2) beside it** — pure math stays trivially invertible for drag
+   re-anchoring, and the default still lands buttons outside the GUI.
+3. **Self-sanitizing record + `isUsable()` at the boundary** — partial
+   data is representable (the edit form builds incomplete buttons);
+   the store boundary decides what persists. This keeps one validation
+   ruleset (`InventoryButton.validCommand`/`validIcon`) used by the
+   form, the store and the activator.
+4. **The activator as the single execution path** — loading, importing
+   and editing are inert by construction (no sender reference), which
+   is the strongest form of the "no command execution on import" rule.
+5. **Edit mode is screen-scoped and keybind-toggled, not a config
+   toggle** — a persisted edit flag would outlive its purpose and
+   confuse players who forget it on.
+6. **Two-click delete instead of a confirmation screen** — the same
+   restraint pattern as the copy toast: no modal for a recoverable-by-
+   recreation action.
+7. **Unknown-but-well-formed icon ids are accepted** — they render as
+   barrier with a tooltip warning, so a typo is visible and fixable
+   instead of silently dropping a user's button.
+
+### Tests performed
+
+- `./gradlew build` green; **307 tests, 0 failures** (53 new: model
+  normalization/validity 8, geometry 8, store round-trip/corruption/
+  per-entry tolerance/duplicate ids 8, tooltips 2, hit testing 4,
+  activator 6, drag session 8, coordinator CRUD/edit mode 5, plus the
+  extended config structure suite covering the new category).
+- The mixin targets (`extractContents`, `extractTooltip`,
+  `mouseClicked(MouseButtonEvent, boolean)`, `mouseDragged`,
+  `mouseReleased`, `removed`) were verified against the 26.3 mapped
+  bytecode before writing the injections; compile + jar contents
+  checked.
+- In-game testing: **none.** Rendering, hover, tooltips, the edit
+  screen and drag interaction need a live client.
+
+### Outstanding problems
+
+- Stage 4 leftovers (player hover cards, real-username display) remain
+  blocked on in-game component capture.
+- The edit screen has no automated tests (pure widget assembly); its
+  validation logic lives in `InventoryButton`/`Identifier.tryParse`,
+  which are covered.
+- Share/import of button sets (`inven-` share type) is deferred to
+  Stage 8 as planned; the store's per-entry policy is the foundation.
