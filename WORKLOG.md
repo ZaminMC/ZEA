@@ -236,3 +236,51 @@ ZEA-REPO (on `main`):
 - Component-tree structure of EarthMC messages unverified (text fixtures
   only) — needs in-game capture.
 - Nickname → real username resolution unresolved (Stage 4).
+
+---
+
+## 2026-11-08 (session 2, continued) — Stage 3 core: feeds and routing
+
+### Work done
+
+- `chat.feeds`: `Feed` (+ `Feeds` registry: 7 default tabs, 6 extra feeds,
+  All aggregates everything including unclassified), `FeedSelection`,
+  `SendTargets`, `ChannelState` (server writing channel — updated only
+  from server reports, cleared on disconnect), `WriteChannel`/`Channels`
+  (verified per-message command table), `OutgoingRouter`,
+  `MultiChannelDispatcher` (staggered dispatch, 1000 ms default interval,
+  failure cancels remaining, batch replacement respects the interval).
+- `chat.ChatSubsystem`: wiring — capture → classify → channel state;
+  dispatcher ticked on client tick, cancelled on disconnect, sends via
+  `ClientPacketListener#sendCommand`.
+- `docs/CHAT_CHANNELS.md`: the three-state model, channel table, dispatch
+  policy, what is deliberately not modeled (switch commands).
+
+### Design decisions
+
+1. **Per-message routing, no switch commands.** ZEA sends `/g <message>`
+   style commands; it never runs `/global` itself. The server writing
+   channel therefore only ever changes through the player's own actions,
+   tracked from server reports — no transition to get wrong.
+2. **Three separate state classes** (`ChannelState`, `FeedSelection`,
+   `SendTargets`) so the spec's "never one overloaded variable" rule is
+   enforced by the type system.
+3. **Uniform dispatch timing** (1000 ms) — conservative against spam
+   limits, never randomized to look human.
+
+### Tests performed
+
+- `./gradlew test`: **110 tests, 0 failures** (27 new: feed filtering and
+  aggregation, router routing/order/rejections, dispatcher interval/
+  cancel/failure/replacement behavior, channel state report/clear).
+- In-game testing: **none.** Runtime behavior (tick wiring, sendCommand)
+  is compile-verified only.
+
+### Outstanding problems
+
+- Server writing-channel report on join unverified — `ChannelState`
+  starts unknown until a report arrives.
+- Dispatch interval and default tabs not yet configurable (MoulConfig
+  options with the Stage 4 UI).
+- Tab rendering, send UI, "All is read-only as a selector" UI enforcement:
+  Stage 4.

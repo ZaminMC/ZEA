@@ -41,11 +41,20 @@ docs/CHAT_CLASSIFICATION.md.
 
 **Deliverable:** reliable EarthMC message classification.
 
-## Stage 3 — Chat feeds and routing
+## Stage 3 — Chat feeds and routing ⏳ (core done)
 
 Channel/feed model, tabs, All aggregation, current server writing-channel
 detection, outgoing channel routing, multi-channel selection with
 conservative configurable dispatch.
+
+Done: feed model and registry (All aggregation, default tabs, extra
+feeds), the three deliberately separate states (server writing channel /
+display selection / send targets), per-message outgoing routing,
+staggered multi-channel dispatch (1000 ms, failure cancels, disconnect
+cancels), ChatSubsystem wiring. See docs/CHAT_CHANNELS.md.
+
+Remaining: tab rendering and the send UI (Stage 4 presentation),
+MoulConfig options (interval, visible tabs).
 
 **Deliverable:** separated and correctly routed EarthMC chat.
 
