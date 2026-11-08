@@ -10,14 +10,22 @@ base {
 }
 
 repositories {
-        // Additional mod dependencies go here; Loom provides the essential
-        // Minecraft/Fabric repositories automatically.
+        // MoulConfig (configuration framework) is published on the NEU maven.
+        maven {
+                name = 'NotEnoughUpdates'
+                url = 'https://maven.notenoughupdates.org/releases/'
+        }
 }
 
 dependencies {
         minecraft "com.mojang:minecraft:${project.minecraft_version}"
         implementation "net.fabricmc:fabric-loader:${project.loader_version}"
         implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+        // MoulConfig ships as a Fabric mod: bundled jar-in-jar, kept as its own
+        // unmodified LGPL jar at runtime.
+        implementation "org.notenoughupdates.moulconfig:modern-26.3:${project.moulconfig_version}"
+        include "org.notenoughupdates.moulconfig:modern-26.3:${project.moulconfig_version}"
 }
 
 processResources {
