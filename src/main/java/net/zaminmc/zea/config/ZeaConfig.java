@@ -3,10 +3,12 @@ package net.zaminmc.zea.config;
 import io.github.notenoughupdates.moulconfig.Config;
 import io.github.notenoughupdates.moulconfig.annotations.Category;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorBoolean;
+import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorDropdown;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorSlider;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigOption;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigOrder;
 import net.zaminmc.zea.chat.feeds.Feeds;
+import net.zaminmc.zea.notify.Notification;
 
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -101,6 +103,28 @@ public final class ZeaConfig extends Config {
                 public boolean unclassified = false;
         }
 
+        /** Notifications about private messages and mentions. */
+        public static final class Notifications {
+                @ConfigOption(name = "PM notifications", desc = "Show a notification when a private "
+                                + "message arrives. It stays until you reply to that player.")
+                @ConfigEditorBoolean
+                @ConfigOrder(0)
+                public boolean pmNotifications = true;
+
+                @ConfigOption(name = "PM notification sound", desc = "Play a soft cue when a private "
+                                + "message arrives.")
+                @ConfigEditorBoolean
+                @ConfigOrder(1)
+                public boolean pmSound = true;
+
+                @ConfigOption(name = "PM notification placement", desc = "Where private message "
+                                + "notifications appear. The action bar is the calmer choice; titles "
+                                + "re-show while the message waits for a reply.")
+                @ConfigEditorDropdown
+                @ConfigOrder(2)
+                public Notification.Destination pmDestination = Notification.Destination.ACTION_BAR;
+        }
+
         private int configVersion = CURRENT_VERSION;
 
         @Category(name = "Chat", desc = "Outgoing chat and multi-channel sending.")
@@ -114,6 +138,10 @@ public final class ZeaConfig extends Config {
         @Category(name = "Chat interface", desc = "How the chat looks and moves.")
         @ConfigOrder(2)
         public ChatInterface chatInterface = new ChatInterface();
+
+        @Category(name = "Notifications", desc = "Private message and mention notifications.")
+        @ConfigOrder(3)
+        public Notifications notifications = new Notifications();
 
         /** Set by the store so the MoulConfig editor's saves go through safe-write. */
         private transient Runnable saveAction;
@@ -165,6 +193,23 @@ public final class ZeaConfig extends Config {
                         ids.add(Feeds.UNCLASSIFIED.id());
                 }
                 return ids;
+        }
+
+        /** Whether private message notifications are enabled; on by default. */
+        public boolean pmNotificationsEnabled() {
+                return notifications.pmNotifications;
+        }
+
+        /** Whether the private message cue sounds; on by default. */
+        public boolean pmSoundEnabled() {
+                return notifications.pmSound;
+        }
+
+        /** Where private message notifications appear; defaults if unset. */
+        public Notification.Destination pmDestination() {
+                return notifications.pmDestination == null
+                                ? Notification.Destination.ACTION_BAR
+                                : notifications.pmDestination;
         }
 
         /** The schema version this instance was loaded from (or wrote). */

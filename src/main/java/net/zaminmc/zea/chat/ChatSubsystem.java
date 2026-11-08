@@ -22,12 +22,15 @@ import net.zaminmc.zea.chat.model.ClassifiedMessage;
 import net.zaminmc.zea.chat.model.WritingChannelReport;
 import net.zaminmc.zea.config.ZeaConfig;
 import net.zaminmc.zea.lifecycle.ClientLifecycle;
+import net.zaminmc.zea.notify.HudNotificationSurface;
+import net.zaminmc.zea.notify.Notifications;
+import net.zaminmc.zea.notify.UiNotificationSound;
 
 /**
- * Coordinates the chat subsystem: capture, classification, channel state
- * and conservative outgoing dispatch. Wiring only — behavior lives in the
- * classify/feeds packages; presentation (tabs, rendering) arrives in
- * Stage 4 and subscribes to the classified stream.
+ * Coordinates the chat subsystem: capture, classification, channel state,
+ * conservative outgoing dispatch and notifications. Wiring only — behavior
+ * lives in the classify/feeds/notify packages; presentation (tabs,
+ * rendering) subscribes to the classified stream.
  */
 public final class ChatSubsystem {
         private final ClassificationPipeline classification;
@@ -38,6 +41,7 @@ public final class ChatSubsystem {
         private final FeedSelection feedSelection = new FeedSelection(Feeds.ALL);
         private final FeedFilter feedFilter = new FeedFilter(classifications(), feedSelection);
         private final MultiChannelDispatcher dispatcher;
+        private final Notifications notifications;
 
         public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification, ZeaConfig config) {
                 this.classification = classification;
@@ -47,11 +51,15 @@ public final class ChatSubsystem {
                                 this::sendCommand,
                                 new DispatchLogger(),
                                 config.dispatchIntervalMillis());
+                this.notifications = new Notifications(new HudNotificationSurface(), config, new UiNotificationSound());
 
-                ClientTickEvents.END_CLIENT_TICK.register(client ->
-                                dispatcher.tick(System.currentTimeMillis()));
+                ClientTickEvents.END_CLIENT_TICK.register(client -> {
+                        dispatcher.tick(System.currentTimeMillis());
+                        notifications.tick(System.currentTimeMillis());
+                });
                 ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
                         dispatcher.cancel();
+                        notifications.clear();
                         channelState.clear();
                         // Display state is EarthMC context; leaving resets it so the
                         // vanilla chat is untouched on other servers.
@@ -63,12 +71,13 @@ public final class ChatSubsystem {
                 new MessageCapture(lifecycle::onEarthMc, this::onCaptured);
         }
 
-        /** Classified stream entry point; feeds/history/notifications subscribe here in later stages. */
+        /** Classified stream entry point; feeds, presentation and notifications subscribe here. */
         private void onCaptured(CapturedMessage captured) {
                 ClassifiedMessage classified = classifications.classify(captured);
                 if (classified.payload() instanceof WritingChannelReport report) {
                         channelState.applyReport(report);
                 }
+                notifications.onClassified(classified, System.currentTimeMillis());
                 ZeaClient.LOGGER.debug("Classified [{}] {}", classified.category(), captured.text());
         }
 
@@ -106,6 +115,10 @@ public final class ChatSubsystem {
 
         public MultiChannelDispatcher dispatcher() {
                 return dispatcher;
+        }
+
+        public Notifications notifications() {
+                return notifications;
         }
 
         private void sendCommand(OutgoingMessage message) throws Exception {

@@ -32,8 +32,20 @@ public record Notification(NotificationKind kind, Component text, Destination de
 
         /** Where the notification is displayed. */
         public enum Destination {
-                ACTION_BAR,
-                TITLE
+                ACTION_BAR("Action bar"),
+                TITLE("Title");
+
+                private final String label;
+
+                Destination(String label) {
+                        this.label = label;
+                }
+
+                /** What the MoulConfig dropdown shows for this choice. */
+                @Override
+                public String toString() {
+                        return label;
+                }
         }
 
         public Notification {
