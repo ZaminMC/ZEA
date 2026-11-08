@@ -23,132 +23,168 @@ import java.util.Set;
  * are dropped on the next save. Version 1 has no migration steps.
  */
 public final class ZeaConfig extends Config {
-	/** Bump when fields change shape; add the matching migration in the store. */
-	public static final int CURRENT_VERSION = 1;
+        /** Bump when fields change shape; add the matching migration in the store. */
+        public static final int CURRENT_VERSION = 1;
 
-	/** Slider bounds, mirrored here so tests can pin the accessible range. */
-	public static final int MIN_DISPATCH_INTERVAL_MILLIS = 500;
-	public static final int MAX_DISPATCH_INTERVAL_MILLIS = 5000;
+        /** Slider bounds, mirrored here so tests can pin the accessible range. */
+        public static final int MIN_DISPATCH_INTERVAL_MILLIS = 500;
+        public static final int MAX_DISPATCH_INTERVAL_MILLIS = 5000;
 
-	/** Chat options. */
-	public static final class Chat {
-		@ConfigOption(name = "Multi-channel sending", desc = "Allow sending one message to several "
-				+ "channels at once with shift-click. Messages are still sent one at a time, "
-				+ "spaced by the dispatch interval below.")
-		@ConfigEditorBoolean
-		@ConfigOrder(0)
-		public boolean multiSendEnabled = false;
+        /** Smooth-chat slider bounds. */
+        public static final int MIN_SMOOTH_CHAT_MILLIS = 50;
+        public static final int MAX_SMOOTH_CHAT_MILLIS = 500;
 
-		@ConfigOption(name = "Dispatch interval", desc = "Milliseconds between messages when "
-				+ "sending to multiple channels. Conservative spacing respects server spam limits.")
-		@ConfigEditorSlider(minValue = MIN_DISPATCH_INTERVAL_MILLIS, maxValue = MAX_DISPATCH_INTERVAL_MILLIS,
-				minStep = 100)
-		@ConfigOrder(1)
-		public int dispatchIntervalMillis = 1000;
-	}
+        /** Chat options. */
+        public static final class Chat {
+                @ConfigOption(name = "Multi-channel sending", desc = "Allow sending one message to several "
+                                + "channels at once with shift-click. Messages are still sent one at a time, "
+                                + "spaced by the dispatch interval below.")
+                @ConfigEditorBoolean
+                @ConfigOrder(0)
+                public boolean multiSendEnabled = false;
 
-	/** Chat tab visibility. The default tabs are always present. */
-	public static final class Tabs {
-		@ConfigOption(name = "Discord tab", desc = "Show incoming Discord messages as a chat tab.")
-		@ConfigEditorBoolean
-		@ConfigOrder(0)
-		public boolean discord = false;
+                @ConfigOption(name = "Dispatch interval", desc = "Milliseconds between messages when "
+                                + "sending to multiple channels. Conservative spacing respects server spam limits.")
+                @ConfigEditorSlider(minValue = MIN_DISPATCH_INTERVAL_MILLIS, maxValue = MAX_DISPATCH_INTERVAL_MILLIS,
+                                minStep = 100)
+                @ConfigOrder(1)
+                public int dispatchIntervalMillis = 1000;
+        }
 
-		@ConfigOption(name = "Votes tab", desc = "Show vote notifications as a chat tab.")
-		@ConfigEditorBoolean
-		@ConfigOrder(1)
-		public boolean votes = false;
+        /** Chat appearance and motion. */
+        public static final class ChatInterface {
+                @ConfigOption(name = "Smooth chat", desc = "Animate chat movement: new messages and "
+                                + "scrolling glide instead of jumping. Right-click copying and search are "
+                                + "unaffected.")
+                @ConfigEditorBoolean
+                @ConfigOrder(0)
+                public boolean smoothChat = true;
 
-		@ConfigOption(name = "Crate wins tab", desc = "Show crate win announcements as a chat tab.")
-		@ConfigEditorBoolean
-		@ConfigOrder(2)
-		public boolean crates = false;
+                @ConfigOption(name = "Smooth chat duration", desc = "How long one scroll animation "
+                                + "takes, in milliseconds. Lower is snappier.")
+                @ConfigEditorSlider(minValue = MIN_SMOOTH_CHAT_MILLIS, maxValue = MAX_SMOOTH_CHAT_MILLIS,
+                                minStep = 10)
+                @ConfigOrder(1)
+                public int smoothChatDurationMillis = 200;
+        }
 
-		@ConfigOption(name = "Deaths tab", desc = "Show death messages as a chat tab.")
-		@ConfigEditorBoolean
-		@ConfigOrder(3)
-		public boolean deaths = false;
+        /** Chat tab visibility. The default tabs are always present. */
+        public static final class Tabs {
+                @ConfigOption(name = "Discord tab", desc = "Show incoming Discord messages as a chat tab.")
+                @ConfigEditorBoolean
+                @ConfigOrder(0)
+                public boolean discord = false;
 
-		@ConfigOption(name = "System tab", desc = "Show server system messages as a chat tab.")
-		@ConfigEditorBoolean
-		@ConfigOrder(4)
-		public boolean system = false;
+                @ConfigOption(name = "Votes tab", desc = "Show vote notifications as a chat tab.")
+                @ConfigEditorBoolean
+                @ConfigOrder(1)
+                public boolean votes = false;
 
-		@ConfigOption(name = "General tab", desc = "Show messages ZEA could not classify as a chat tab.")
-		@ConfigEditorBoolean
-		@ConfigOrder(5)
-		public boolean unclassified = false;
-	}
+                @ConfigOption(name = "Crate wins tab", desc = "Show crate win announcements as a chat tab.")
+                @ConfigEditorBoolean
+                @ConfigOrder(2)
+                public boolean crates = false;
 
-	private int configVersion = CURRENT_VERSION;
+                @ConfigOption(name = "Deaths tab", desc = "Show death messages as a chat tab.")
+                @ConfigEditorBoolean
+                @ConfigOrder(3)
+                public boolean deaths = false;
 
-	@Category(name = "Chat", desc = "Outgoing chat and multi-channel sending.")
-	@ConfigOrder(0)
-	public Chat chat = new Chat();
+                @ConfigOption(name = "System tab", desc = "Show server system messages as a chat tab.")
+                @ConfigEditorBoolean
+                @ConfigOrder(4)
+                public boolean system = false;
 
-	@Category(name = "Tabs", desc = "Which additional chat tabs are shown. The default tabs are always visible.")
-	@ConfigOrder(1)
-	public Tabs tabs = new Tabs();
+                @ConfigOption(name = "General tab", desc = "Show messages ZEA could not classify as a chat tab.")
+                @ConfigEditorBoolean
+                @ConfigOrder(5)
+                public boolean unclassified = false;
+        }
 
-	/** Set by the store so the MoulConfig editor's saves go through safe-write. */
-	private transient Runnable saveAction;
+        private int configVersion = CURRENT_VERSION;
 
-	/** Interval between multi-channel dispatches, clamped to the slider range. */
-	public long dispatchIntervalMillis() {
-		return Math.clamp(chat.dispatchIntervalMillis,
-				MIN_DISPATCH_INTERVAL_MILLIS, MAX_DISPATCH_INTERVAL_MILLIS);
-	}
+        @Category(name = "Chat", desc = "Outgoing chat and multi-channel sending.")
+        @ConfigOrder(0)
+        public Chat chat = new Chat();
 
-	/** Whether multi-target sending is enabled; disabled by default per the Phase 1 spec. */
-	public boolean multiSendEnabled() {
-		return chat.multiSendEnabled;
-	}
+        @Category(name = "Tabs", desc = "Which additional chat tabs are shown. The default tabs are always visible.")
+        @ConfigOrder(1)
+        public Tabs tabs = new Tabs();
 
-	/**
-	 * The extra feed ids whose tabs the user enabled. Ids come from
-	 * {@link Feeds} so the mapping cannot drift from the registry.
-	 */
-	public Set<String> enabledExtraFeedIds() {
-		Set<String> ids = new LinkedHashSet<>();
-		if (tabs.discord) {
-			ids.add(Feeds.DISCORD.id());
-		}
-		if (tabs.votes) {
-			ids.add(Feeds.VOTES.id());
-		}
-		if (tabs.crates) {
-			ids.add(Feeds.CRATE_WINS.id());
-		}
-		if (tabs.deaths) {
-			ids.add(Feeds.DEATHS.id());
-		}
-		if (tabs.system) {
-			ids.add(Feeds.SYSTEM.id());
-		}
-		if (tabs.unclassified) {
-			ids.add(Feeds.UNCLASSIFIED.id());
-		}
-		return ids;
-	}
+        @Category(name = "Chat interface", desc = "How the chat looks and moves.")
+        @ConfigOrder(2)
+        public ChatInterface chatInterface = new ChatInterface();
 
-	/** The schema version this instance was loaded from (or wrote). */
-	public int configVersion() {
-		return configVersion;
-	}
+        /** Set by the store so the MoulConfig editor's saves go through safe-write. */
+        private transient Runnable saveAction;
 
-	/** Marks the instance as migrated to {@link #CURRENT_VERSION}. */
-	public void markMigrated() {
-		configVersion = CURRENT_VERSION;
-	}
+        /** Interval between multi-channel dispatches, clamped to the slider range. */
+        public long dispatchIntervalMillis() {
+                return Math.clamp(chat.dispatchIntervalMillis,
+                                MIN_DISPATCH_INTERVAL_MILLIS, MAX_DISPATCH_INTERVAL_MILLIS);
+        }
 
-	public void setSaveAction(Runnable saveAction) {
-		this.saveAction = saveAction;
-	}
+        /** Whether multi-target sending is enabled; disabled by default per the Phase 1 spec. */
+        public boolean multiSendEnabled() {
+                return chat.multiSendEnabled;
+        }
 
-	@Override
-	public void saveNow() {
-		if (saveAction != null) {
-			saveAction.run();
-		}
-	}
+        /** Whether smooth chat is enabled; on by default. */
+        public boolean smoothChatEnabled() {
+                return chatInterface.smoothChat;
+        }
+
+        /** The smooth-chat animation length, clamped to the slider range. */
+        public int smoothChatDurationMillis() {
+                return (int) Math.clamp(chatInterface.smoothChatDurationMillis,
+                                MIN_SMOOTH_CHAT_MILLIS, MAX_SMOOTH_CHAT_MILLIS);
+        }
+
+        /**
+         * The extra feed ids whose tabs the user enabled. Ids come from
+         * {@link Feeds} so the mapping cannot drift from the registry.
+         */
+        public Set<String> enabledExtraFeedIds() {
+                Set<String> ids = new LinkedHashSet<>();
+                if (tabs.discord) {
+                        ids.add(Feeds.DISCORD.id());
+                }
+                if (tabs.votes) {
+                        ids.add(Feeds.VOTES.id());
+                }
+                if (tabs.crates) {
+                        ids.add(Feeds.CRATE_WINS.id());
+                }
+                if (tabs.deaths) {
+                        ids.add(Feeds.DEATHS.id());
+                }
+                if (tabs.system) {
+                        ids.add(Feeds.SYSTEM.id());
+                }
+                if (tabs.unclassified) {
+                        ids.add(Feeds.UNCLASSIFIED.id());
+                }
+                return ids;
+        }
+
+        /** The schema version this instance was loaded from (or wrote). */
+        public int configVersion() {
+                return configVersion;
+        }
+
+        /** Marks the instance as migrated to {@link #CURRENT_VERSION}. */
+        public void markMigrated() {
+                configVersion = CURRENT_VERSION;
+        }
+
+        public void setSaveAction(Runnable saveAction) {
+                this.saveAction = saveAction;
+        }
+
+        @Override
+        public void saveNow() {
+                if (saveAction != null) {
+                        saveAction.run();
+                }
+        }
 }
