@@ -429,3 +429,89 @@ vanilla's own formulas, but no in-game check has happened yet.
 - Unchanged from the previous session, plus: toast text is
   English-only until more languages are contributed.
 
+---
+
+## 2026-11-09 (session 4, continued) — Chat search, smooth chat
+
+### Work done
+
+- **Chat search** (`Ctrl+F`): `FeedFilter` holds the query — the single
+  source of truth — and composes it with the selected feed's predicate
+  (a search narrows even on All; a blank open query narrows nothing;
+  `null` means closed). `ChatSearchBar` is a borderless vanilla
+  `EditBox` with the flat chat background. `ChatScreenMixin` wires it:
+  Ctrl+F toggles (macOS: Cmd+F via the vanilla control quirk), live
+  filtering per keystroke, Escape closes the search before it closes
+  the screen, Enter while focused returns focus to the input (so the
+  input's text can never be sent accidentally mid-search), and
+  `removed()` closes the search when the screen goes away — the
+  visible-message filter also affects the HUD, which must never stay
+  narrowed invisibly. The query survives window resize (state lives in
+  the filter, the widget is rebuilt by init) and resets on disconnect.
+- **Smooth chat**: `SmoothChat` keeps one vertical offset (unscaled
+  chat units) that starts at a scroll discontinuity and eases to zero
+  (quartic ease-out; mid-flight discontinuities accumulate from the
+  remaining offset). `ChatComponentMixin` records the anchor around
+  `scrollChat`, `resetChatScroll` and `addMessageToDisplayQueue`
+  (message line count captured by wrapping `GuiMessage.splitLines`,
+  because the trimmed list's 100-entry cap makes growth under-report
+  on busy channels; the add-path's internal pin scroll is skipped via
+  a flag), and translates the chat's pushed pose by the eased
+  remainder at render time (chat units × chat scale = gui pixels;
+  `pushMatrix` wrapped so the package-private `DisplayMode` parameter
+  never has to be referenced). EarthMC-gated, configurable, on by
+  default (200 ms).
+- **Configuration**: new "Chat interface" category — smooth chat
+  toggle + duration slider (50–500 ms, clamped accessor). Additive
+  fields; older files keep defaults, no migration needed.
+- Verified from the mapped jar before writing code: 26.3 focus
+  cycling skips invisible widgets (`isActive` = visible ∧ active), Tab
+  focus cannot land on the hidden search field; `KeyEvent` carries
+  `shortcutKey`/`isEscape`/`isConfirmation`/`hasControlDownWithQuirk`;
+  `resetChatScroll` fires from `ChatScreen.removed`.
+- **Chat dimensions dropped as a work item**: vanilla 26.3 ships
+  `chatWidth`, `chatHeightFocused` and `chatHeightUnfocused` options
+  itself. Re-implementing them would duplicate vanilla settings and
+  fight its own options screen.
+
+### Design decisions
+
+1. **Query state in `FeedFilter`, not the screen** — one writer of
+   `setVisibleMessageFilter`, resize-safe, resettable on disconnect.
+2. **Search composes rather than replaces the feed filter** — the tab
+   you are viewing stays the search domain.
+3. **Trigger hooks around anchor changes, render hook applies the
+   offset** — the animation is a pure function of (anchor history,
+   clock), so the two halves stay independently testable.
+4. **`@WrapOperation` on `pushMatrix`** for the render hook: the
+   handler needs no target-method parameters, dodging the
+   package-private `DisplayMode`, and composes with other mods'
+   wraps of the same call.
+
+### Tests performed
+
+- `./gradlew build` successful; jar contains the new classes and mixin
+  registration.
+- `./gradlew test`: **171 tests, 0 failures** (15 new: 6 search
+   composition in FeedFilterTest — blank query, All narrowing,
+   case-insensitivity, feed composition, styled flatten, close
+   restore; 8 SmoothChat — full start, negative start, exact-zero end,
+   quartic shape at t=¼ and t=½, mid-flight accumulation,
+   zero-duration collapse, zero-shift no-op, finished-state reset;
+   1 config clamp).
+- Mixin descriptors re-audited against `javap` output (method
+  signatures, the `splitLines`/`pushMatrix` targets, the public
+  `extractRenderState` descriptor).
+- In-game testing: **none.** Both features are compile- and
+  unit-verified; the pose translate, easing feel, search focus flow
+  and copy hit-testing need a live client.
+
+### Outstanding problems
+
+- Nickname → real username resolution unresolved (Stage 4 remainder).
+- Player hover presentation, configurable controls: Stage 4 remainder.
+- Smooth chat: hover/click hit regions follow the settled anchor, so
+  they can lag the visuals by up to one animation (~200 ms); clicks in
+  practice land after the glide. Tab bar width with chat scale below 1
+  (cosmetic) and writing-channel report on join — unchanged.
+

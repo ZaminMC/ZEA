@@ -56,16 +56,21 @@ wiring. See docs/CHAT_CHANNELS.md.
 
 **Deliverable:** separated and correctly routed EarthMC chat.
 
-## Stage 4 — Chat presentation and QoL ⏳ (tabs done)
+## Stage 4 — Chat presentation and QoL ⏳ (core done)
 
 Smooth chat, search (Ctrl+F), message copying, chat dimensions, configurable
 appearance, player hover presentation, real-username display option.
 
 Done: chat tab bar (EarthMC-only, flat design), feed filtering through
-the official `setVisibleMessageFilter` hook (identity-keyed classification
-cache), and message copying (right-click plain, alt+right-click formatted,
-legacy serializer, confirmation toast). Remaining: smooth chat, search,
-configurable controls, dimensions, player hover, username option.
+the official `setVisibleMessageFilter` hook (identity-keyed
+classification cache), message copying (right-click plain,
+alt+right-click formatted, legacy serializer, confirmation toast),
+chat search (Ctrl+F, composes with the selected feed, survives resize,
+clears on close/disconnect), and smooth chat (quartic ease-out for new
+messages, wheel/page scrolling and the close-screen reset; configurable
+duration, on by default). Chat dimensions need no ZEA work: vanilla 26.3
+ships width and focused/unfocused height options. Remaining:
+configurable controls, player hover, username option.
 
 **Deliverable:** modernized chat interface.
 
