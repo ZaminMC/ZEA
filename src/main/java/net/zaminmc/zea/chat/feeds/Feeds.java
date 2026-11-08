@@ -57,6 +57,21 @@ public final class Feeds {
 		return List.copyOf(extras);
 	}
 
+	/**
+	 * The tabs the user sees: the default tabs plus the extra feeds whose
+	 * ids were enabled in configuration. Unknown ids are ignored so a
+	 * stale config cannot break rendering.
+	 */
+	public static List<Feed> visibleTabs(Set<String> enabledExtraFeedIds) {
+		List<Feed> tabs = new ArrayList<>(defaultVisibleTabs());
+		for (Feed extra : extraFeeds()) {
+			if (enabledExtraFeedIds.contains(extra.id())) {
+				tabs.add(extra);
+			}
+		}
+		return List.copyOf(tabs);
+	}
+
 	private Feeds() {
 	}
 }

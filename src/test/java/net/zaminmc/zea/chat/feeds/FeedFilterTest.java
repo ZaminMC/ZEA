@@ -11,6 +11,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -71,5 +72,29 @@ class FeedFilterTest {
 					.anyMatch(feed -> feed.shows(classified(category)));
 			assertTrue(visibleSomewhere, category + " has no feed");
 		}
+	}
+
+	@Test
+	void visibleTabsDefaultToTheImportantOnes() {
+		List<String> ids = Feeds.visibleTabs(Set.of()).stream().map(Feed::id).toList();
+
+		assertEquals(List.of("all", "global", "local", "trade", "nation", "town", "pms"), ids);
+	}
+
+	@Test
+	void enabledExtrasAppendAfterTheDefaultTabs() {
+		List<String> ids = Feeds.visibleTabs(Set.of("deaths", "discord")).stream()
+				.map(Feed::id).toList();
+
+		assertEquals(List.of("all", "global", "local", "trade", "nation", "town", "pms",
+				"discord", "deaths"), ids);
+	}
+
+	@Test
+	void unknownEnabledIdsAreIgnored() {
+		List<String> ids = Feeds.visibleTabs(Set.of("nonsense", "votes")).stream()
+				.map(Feed::id).toList();
+
+		assertEquals(List.of("all", "global", "local", "trade", "nation", "town", "pms", "votes"), ids);
 	}
 }

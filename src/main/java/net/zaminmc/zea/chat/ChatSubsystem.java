@@ -9,10 +9,14 @@ import net.zaminmc.zea.chat.capture.MessageCapture;
 import net.zaminmc.zea.chat.classify.ClassificationPipeline;
 import net.zaminmc.zea.chat.feeds.ChannelState;
 import net.zaminmc.zea.chat.feeds.MultiChannelDispatcher;
+import net.zaminmc.zea.chat.feeds.MultiSendResult;
 import net.zaminmc.zea.chat.feeds.OutgoingMessage;
+import net.zaminmc.zea.chat.feeds.OutgoingRouter;
+import net.zaminmc.zea.chat.feeds.SendTargets;
 import net.zaminmc.zea.chat.model.CapturedMessage;
 import net.zaminmc.zea.chat.model.ClassifiedMessage;
 import net.zaminmc.zea.chat.model.WritingChannelReport;
+import net.zaminmc.zea.config.ZeaConfig;
 import net.zaminmc.zea.lifecycle.ClientLifecycle;
 
 /**
@@ -22,19 +26,19 @@ import net.zaminmc.zea.lifecycle.ClientLifecycle;
  * Stage 4 and subscribes to the classified stream.
  */
 public final class ChatSubsystem {
-	/** Conservative default spacing between multi-channel dispatches. */
-	private static final long DISPATCH_INTERVAL_MILLIS = 1000;
-
 	private final ClassificationPipeline classification;
+	private final ZeaConfig config;
+	private final OutgoingRouter router = new OutgoingRouter();
 	private final ChannelState channelState = new ChannelState();
 	private final MultiChannelDispatcher dispatcher;
 
-	public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification) {
+	public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification, ZeaConfig config) {
 		this.classification = classification;
+		this.config = config;
 		this.dispatcher = new MultiChannelDispatcher(
 				this::sendCommand,
 				new DispatchLogger(),
-				DISPATCH_INTERVAL_MILLIS);
+				config.dispatchIntervalMillis());
 
 		ClientTickEvents.END_CLIENT_TICK.register(client ->
 				dispatcher.tick(System.currentTimeMillis()));
@@ -53,6 +57,22 @@ public final class ChatSubsystem {
 			channelState.applyReport(report);
 		}
 		ZeaClient.LOGGER.debug("Classified [{}] {}", classified.category(), captured.text());
+	}
+
+	/**
+	 * Sends one message to the shift-click selected channels. Refused
+	 * unless the user enabled multi-channel sending; accepted batches
+	 * dispatch one message at a time, spaced by the configured interval.
+	 */
+	public MultiSendResult sendToTargets(SendTargets targets, String message) {
+		if (!config.multiSendEnabled()) {
+			return MultiSendResult.DISABLED;
+		}
+		if (targets == null || targets.isEmpty()) {
+			return MultiSendResult.NO_TARGETS;
+		}
+		dispatcher.dispatch(router.route(targets.targets(), message));
+		return MultiSendResult.DISPATCHING;
 	}
 
 	public ChannelState channelState() {
