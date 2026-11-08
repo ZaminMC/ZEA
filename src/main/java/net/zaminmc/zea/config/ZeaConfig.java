@@ -5,6 +5,7 @@ import io.github.notenoughupdates.moulconfig.annotations.Category;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorBoolean;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorDropdown;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorSlider;
+import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorText;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigOption;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigOrder;
 import net.zaminmc.zea.chat.feeds.Feeds;
@@ -35,6 +36,10 @@ public final class ZeaConfig extends Config {
         /** Smooth-chat slider bounds. */
         public static final int MIN_SMOOTH_CHAT_MILLIS = 50;
         public static final int MAX_SMOOTH_CHAT_MILLIS = 500;
+
+        /** Auto-response cooldown slider bounds, in seconds. */
+        public static final int MIN_AUTO_RESPONSE_COOLDOWN_SECONDS = 10;
+        public static final int MAX_AUTO_RESPONSE_COOLDOWN_SECONDS = 300;
 
         /** Chat options. */
         public static final class Chat {
@@ -151,6 +156,27 @@ public final class ZeaConfig extends Config {
                 @ConfigEditorBoolean
                 @ConfigOrder(0)
                 public boolean highlight = true;
+
+                @ConfigOption(name = "Auto-respond to mentions", desc = "Automatically send the "
+                                + "response below when someone mentions you. Off by default; "
+                                + "cooldown-limited and capped per session.")
+                @ConfigEditorBoolean
+                @ConfigOrder(1)
+                public boolean autoRespond = false;
+
+                @ConfigOption(name = "Auto-response message", desc = "What to send when the "
+                                + "auto-response triggers. Keep it short, and do not include "
+                                + "other players' names — the response is public chat.")
+                @ConfigEditorText(forbidden = "")
+                @ConfigOrder(2)
+                public String autoResponseText = "";
+
+                @ConfigOption(name = "Auto-response cooldown", desc = "Minimum seconds between "
+                                + "two automatic responses.")
+                @ConfigEditorSlider(minValue = MIN_AUTO_RESPONSE_COOLDOWN_SECONDS,
+                                maxValue = MAX_AUTO_RESPONSE_COOLDOWN_SECONDS, minStep = 5)
+                @ConfigOrder(3)
+                public int autoResponseCooldownSeconds = 30;
         }
 
         private int configVersion = CURRENT_VERSION;
@@ -264,6 +290,22 @@ public final class ZeaConfig extends Config {
         /** Whether mentioned chat lines are tinted; on by default. */
         public boolean mentionHighlightEnabled() {
                 return mentions.highlight;
+        }
+
+        /** Whether the mention auto-response is enabled; off by default. */
+        public boolean autoRespondEnabled() {
+                return mentions.autoRespond;
+        }
+
+        /** The configured auto-response text, trimmed. */
+        public String autoResponseText() {
+                return mentions.autoResponseText == null ? "" : mentions.autoResponseText.strip();
+        }
+
+        /** The auto-response cooldown, clamped to the slider range. */
+        public long autoResponseCooldownMillis() {
+                return Math.clamp(mentions.autoResponseCooldownSeconds,
+                                MIN_AUTO_RESPONSE_COOLDOWN_SECONDS, MAX_AUTO_RESPONSE_COOLDOWN_SECONDS) * 1000L;
         }
 
         /** The schema version this instance was loaded from (or wrote). */

@@ -22,11 +22,13 @@ import net.zaminmc.zea.chat.model.ClassifiedMessage;
 import net.zaminmc.zea.chat.model.WritingChannelReport;
 import net.zaminmc.zea.config.ZeaConfig;
 import net.zaminmc.zea.lifecycle.ClientLifecycle;
-import net.zaminmc.zea.mention.MentionResponder;
+import net.zaminmc.zea.mention.MentionAutoResponder;
 import net.zaminmc.zea.mention.Mentions;
 import net.zaminmc.zea.notify.HudNotificationSurface;
 import net.zaminmc.zea.notify.Notifications;
 import net.zaminmc.zea.notify.UiNotificationSound;
+
+import java.util.List;
 
 /**
  * Coordinates the chat subsystem: capture, classification, channel state,
@@ -45,6 +47,7 @@ public final class ChatSubsystem {
         private final MultiChannelDispatcher dispatcher;
         private final Notifications notifications;
         private final Mentions mentions;
+        private final MentionAutoResponder autoResponder;
 
         public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification, ZeaConfig config) {
                 this.classification = classification;
@@ -55,12 +58,14 @@ public final class ChatSubsystem {
                                 new DispatchLogger(),
                                 config.dispatchIntervalMillis());
                 this.notifications = new Notifications(new HudNotificationSurface(), config, new UiNotificationSound());
+                this.autoResponder = new MentionAutoResponder(config,
+                                message -> dispatcher.dispatch(List.of(message)));
                 this.mentions = new Mentions(
                                 () -> Minecraft.getInstance().getUser().getName(),
                                 this.notifications,
                                 new UiNotificationSound(),
                                 config,
-                                MentionResponder.NONE);
+                                autoResponder);
 
                 ClientTickEvents.END_CLIENT_TICK.register(client -> {
                         dispatcher.tick(System.currentTimeMillis());
@@ -70,6 +75,7 @@ public final class ChatSubsystem {
                         dispatcher.cancel();
                         notifications.clear();
                         mentions.highlight().clear();
+                        autoResponder.reset();
                         channelState.clear();
                         // Display state is EarthMC context; leaving resets it so the
                         // vanilla chat is untouched on other servers.

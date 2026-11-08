@@ -5,7 +5,9 @@ import io.github.notenoughupdates.moulconfig.annotations.Category;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorBoolean;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorDropdown;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorSlider;
+import io.github.notenoughupdates.moulconfig.annotations.ConfigEditorText;
 import io.github.notenoughupdates.moulconfig.annotations.ConfigOption;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Annotation;
@@ -25,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ZeaConfigStructureTest {
         private static final List<Class<? extends Annotation>> EDITOR_ANNOTATIONS = List.of(
-                        ConfigEditorBoolean.class, ConfigEditorSlider.class, ConfigEditorDropdown.class);
+                        ConfigEditorBoolean.class, ConfigEditorSlider.class, ConfigEditorDropdown.class, ConfigEditorText.class);
 
         @Test
         void extendsMoulConfigBase() {
@@ -64,6 +66,9 @@ class ZeaConfigStructureTest {
                                                 .filter(a -> field.isAnnotationPresent(a)).toList();
                                 assertTrue(!editors.isEmpty(),
                                                 category.getSimpleName() + "." + field.getName() + " has no editor annotation");
+                                Assertions.assertEquals(1, editors.size(),
+                                                category.getSimpleName() + "." + field.getName()
+                                                                + " has more than one editor annotation");
                                 if (editors.contains(ConfigEditorSlider.class)) {
                                         assertTrue(field.getType() == int.class || field.getType() == float.class
                                                         || field.getType() == double.class || field.getType() == long.class,
@@ -77,6 +82,11 @@ class ZeaConfigStructureTest {
                                         assertTrue(field.getType() == String.class || field.getType().isEnum(),
                                                         category.getSimpleName() + "." + field.getName()
                                                                         + " is a dropdown but neither a string nor an enum");
+                                }
+                                if (editors.contains(ConfigEditorText.class)) {
+                                        assertTrue(field.getType() == String.class,
+                                                        category.getSimpleName() + "." + field.getName()
+                                                                        + " is a text field but not a string");
                                 }
                         }
                 }

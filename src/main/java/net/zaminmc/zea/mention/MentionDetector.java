@@ -1,6 +1,5 @@
 package net.zaminmc.zea.mention;
 
-import net.zaminmc.zea.chat.model.CapturedMessage;
 import net.zaminmc.zea.chat.model.ChannelChat;
 import net.zaminmc.zea.chat.model.ClassifiedMessage;
 import net.zaminmc.zea.chat.model.DiscordMessage;
@@ -62,21 +61,21 @@ public final class MentionDetector {
                 }
 
                 if (message.payload() instanceof ChannelChat chat) {
-                        return forChat(message.captured(), chat.displayName(), chat.content(), localName);
+                        return forChat(message, chat.displayName(), chat.content(), localName);
                 }
-                return forUnstructured(message.captured(), message.captured().text(), localName);
+                return forUnstructured(message, message.captured().text(), localName);
         }
 
-        private Optional<Mention> forChat(CapturedMessage source, String speaker, String content, String localName) {
+        private Optional<Mention> forChat(ClassifiedMessage message, String speaker, String content, String localName) {
                 if (speaker.equalsIgnoreCase(localName)) {
                         return Optional.empty();
                 }
                 return containsWord(content, localName)
-                                ? Optional.of(new Mention(source, speaker, content))
+                                ? Optional.of(new Mention(message.captured(), speaker, content, message.category()))
                                 : Optional.empty();
         }
 
-        private Optional<Mention> forUnstructured(CapturedMessage source, String text, String localName) {
+        private Optional<Mention> forUnstructured(ClassifiedMessage message, String text, String localName) {
                 int separator = text.indexOf(SEPARATOR);
                 if (separator <= 0) {
                         return Optional.empty();
@@ -87,7 +86,7 @@ public final class MentionDetector {
                 }
                 String content = text.substring(separator + SEPARATOR.length());
                 return containsWord(content, localName)
-                                ? Optional.of(new Mention(source, speaker, content))
+                                ? Optional.of(new Mention(message.captured(), speaker, content, message.category()))
                                 : Optional.empty();
         }
 
