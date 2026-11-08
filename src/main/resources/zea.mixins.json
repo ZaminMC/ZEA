@@ -4,7 +4,7 @@
         "package": "net.zaminmc.zea.mixin",
         "compatibilityLevel": "JAVA_25",
         "client": [
-                "ChatComponentAccessor", "ChatComponentMixin", "ChatScreenMixin"
+                "ChatComponentAccessor", "ChatComponentMixin", "ChatScreenMixin", "MentionHighlightMixin"
         ],
         "injectors": {
                 "defaultRequire": 1

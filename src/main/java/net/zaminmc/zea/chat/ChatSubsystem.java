@@ -22,6 +22,8 @@ import net.zaminmc.zea.chat.model.ClassifiedMessage;
 import net.zaminmc.zea.chat.model.WritingChannelReport;
 import net.zaminmc.zea.config.ZeaConfig;
 import net.zaminmc.zea.lifecycle.ClientLifecycle;
+import net.zaminmc.zea.mention.MentionResponder;
+import net.zaminmc.zea.mention.Mentions;
 import net.zaminmc.zea.notify.HudNotificationSurface;
 import net.zaminmc.zea.notify.Notifications;
 import net.zaminmc.zea.notify.UiNotificationSound;
@@ -42,6 +44,7 @@ public final class ChatSubsystem {
         private final FeedFilter feedFilter = new FeedFilter(classifications(), feedSelection);
         private final MultiChannelDispatcher dispatcher;
         private final Notifications notifications;
+        private final Mentions mentions;
 
         public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification, ZeaConfig config) {
                 this.classification = classification;
@@ -52,6 +55,12 @@ public final class ChatSubsystem {
                                 new DispatchLogger(),
                                 config.dispatchIntervalMillis());
                 this.notifications = new Notifications(new HudNotificationSurface(), config, new UiNotificationSound());
+                this.mentions = new Mentions(
+                                () -> Minecraft.getInstance().getUser().getName(),
+                                this.notifications,
+                                new UiNotificationSound(),
+                                config,
+                                MentionResponder.NONE);
 
                 ClientTickEvents.END_CLIENT_TICK.register(client -> {
                         dispatcher.tick(System.currentTimeMillis());
@@ -60,6 +69,7 @@ public final class ChatSubsystem {
                 ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
                         dispatcher.cancel();
                         notifications.clear();
+                        mentions.highlight().clear();
                         channelState.clear();
                         // Display state is EarthMC context; leaving resets it so the
                         // vanilla chat is untouched on other servers.
@@ -78,6 +88,7 @@ public final class ChatSubsystem {
                         channelState.applyReport(report);
                 }
                 notifications.onClassified(classified, System.currentTimeMillis());
+                mentions.onClassified(classified, System.currentTimeMillis());
                 ZeaClient.LOGGER.debug("Classified [{}] {}", classified.category(), captured.text());
         }
 
@@ -119,6 +130,10 @@ public final class ChatSubsystem {
 
         public Notifications notifications() {
                 return notifications;
+        }
+
+        public Mentions mentions() {
+                return mentions;
         }
 
         private void sendCommand(OutgoingMessage message) throws Exception {

@@ -123,6 +123,34 @@ public final class ZeaConfig extends Config {
                 @ConfigEditorDropdown
                 @ConfigOrder(2)
                 public Notification.Destination pmDestination = Notification.Destination.ACTION_BAR;
+
+                @ConfigOption(name = "Mention notifications", desc = "Show a short notification when "
+                                + "someone mentions your name in chat.")
+                @ConfigEditorBoolean
+                @ConfigOrder(3)
+                public boolean mentionNotifications = true;
+
+                @ConfigOption(name = "Mention notification sound", desc = "Play a soft cue when "
+                                + "someone mentions your name in chat.")
+                @ConfigEditorBoolean
+                @ConfigOrder(4)
+                public boolean mentionSound = true;
+
+                @ConfigOption(name = "Mention notification placement", desc = "Where mention "
+                                + "notifications appear.")
+                @ConfigEditorDropdown
+                @ConfigOrder(5)
+                public Notification.Destination mentionDestination = Notification.Destination.ACTION_BAR;
+        }
+
+        /** Mentions: chat highlighting and the opt-in auto-response. */
+        public static final class Mentions {
+                @ConfigOption(name = "Highlight mentioned messages", desc = "Tint the background of "
+                                + "chat lines that mention your name, so they stand out while "
+                                + "scrolling.")
+                @ConfigEditorBoolean
+                @ConfigOrder(0)
+                public boolean highlight = true;
         }
 
         private int configVersion = CURRENT_VERSION;
@@ -142,6 +170,10 @@ public final class ZeaConfig extends Config {
         @Category(name = "Notifications", desc = "Private message and mention notifications.")
         @ConfigOrder(3)
         public Notifications notifications = new Notifications();
+
+        @Category(name = "Mentions", desc = "How mentions of your name are handled in chat.")
+        @ConfigOrder(4)
+        public Mentions mentions = new Mentions();
 
         /** Set by the store so the MoulConfig editor's saves go through safe-write. */
         private transient Runnable saveAction;
@@ -210,6 +242,28 @@ public final class ZeaConfig extends Config {
                 return notifications.pmDestination == null
                                 ? Notification.Destination.ACTION_BAR
                                 : notifications.pmDestination;
+        }
+
+        /** Whether mention notifications are enabled; on by default. */
+        public boolean mentionNotificationsEnabled() {
+                return notifications.mentionNotifications;
+        }
+
+        /** Whether the mention cue sounds; on by default. */
+        public boolean mentionSoundEnabled() {
+                return notifications.mentionSound;
+        }
+
+        /** Where mention notifications appear; defaults if unset. */
+        public Notification.Destination mentionDestination() {
+                return notifications.mentionDestination == null
+                                ? Notification.Destination.ACTION_BAR
+                                : notifications.mentionDestination;
+        }
+
+        /** Whether mentioned chat lines are tinted; on by default. */
+        public boolean mentionHighlightEnabled() {
+                return mentions.highlight;
         }
 
         /** The schema version this instance was loaded from (or wrote). */
