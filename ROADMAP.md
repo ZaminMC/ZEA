@@ -41,7 +41,7 @@ docs/CHAT_CLASSIFICATION.md.
 
 **Deliverable:** reliable EarthMC message classification.
 
-## Stage 3 — Chat feeds and routing ⏳ (core done)
+## Stage 3 — Chat feeds and routing ✅
 
 Channel/feed model, tabs, All aggregation, current server writing-channel
 detection, outgoing channel routing, multi-channel selection with
@@ -50,18 +50,21 @@ conservative configurable dispatch.
 Done: feed model and registry (All aggregation, default tabs, extra
 feeds), the three deliberately separate states (server writing channel /
 display selection / send targets), per-message outgoing routing,
-staggered multi-channel dispatch (1000 ms, failure cancels, disconnect
-cancels), ChatSubsystem wiring. See docs/CHAT_CHANNELS.md.
-
-Remaining: tab rendering and the send UI (Stage 4 presentation),
-MoulConfig options (interval, visible tabs).
+staggered multi-channel dispatch with configurable interval (MoulConfig),
+multi-send gated behind configuration (off by default), ChatSubsystem
+wiring. See docs/CHAT_CHANNELS.md.
 
 **Deliverable:** separated and correctly routed EarthMC chat.
 
-## Stage 4 — Chat presentation and QoL
+## Stage 4 — Chat presentation and QoL ⏳ (tabs done)
 
 Smooth chat, search (Ctrl+F), message copying, chat dimensions, configurable
 appearance, player hover presentation, real-username display option.
+
+Done: chat tab bar (EarthMC-only, flat design) and feed filtering through
+the official `setVisibleMessageFilter` hook, with an identity-keyed
+classification cache. Remaining: smooth chat, search, copying, dimensions,
+player hover, username option.
 
 **Deliverable:** modernized chat interface.
 

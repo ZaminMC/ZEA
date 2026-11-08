@@ -284,3 +284,81 @@ ZEA-REPO (on `main`):
   options with the Stage 4 UI).
 - Tab rendering, send UI, "All is read-only as a selector" UI enforcement:
   Stage 4.
+
+---
+
+## 2026-11-09 (session 3) — Configuration, chat tab bar, feed filtering
+
+### Work done
+
+- **MoulConfig configuration** (`config` package): `ZeaConfig` with two
+  categories — Chat (multi-channel sending off by default, dispatch
+  interval slider 500–5000 ms) and Tabs (per-feed visibility for the six
+  extra feeds). `ZeaConfigStore` persists it through the safe-write
+  protocol (round-trip verified, atomic replace, corrupt files preserved
+  as `*.corrupted` with defaults restored). `saveNow` is routed through
+  the store so MoulConfig editor saves are safe writes. `configVersion`
+  gates migrations (none needed at v1).
+- **Wiring**: `ChatSubsystem` reads the dispatch interval and gates
+  multi-target sends behind the config flag (`MultiSendResult`);
+  `Feeds.visibleTabs` resolves the tab strip from enabled extra feeds;
+  `ZeaClient` loads the config at init.
+- **Chat tab bar** (`chat.render.ChatTabBar` + `mixin.ChatScreenMixin`):
+  a flat, borderless tab strip above the chat input, EarthMC-only. Plain
+  click switches the display feed; rendering is a translucent fill and a
+  label, nothing else.
+- **Feed filtering**: applies the selected feed as the vanilla chat's
+  official `setVisibleMessageFilter` — visual only, every message stays
+  in history (All restores vanilla behavior by clearing the filter).
+  `ClassificationCache` maps displayed components back to classifications
+  by identity, bounded at 512 entries, single classification per message
+  shared between capture and filtering. Display state resets to All on
+  disconnect so other servers see untouched chat.
+
+### Research performed
+
+- Verified the 26.3 chat integration surface by decompiling the mapped
+  jar: `ChatComponent.setVisibleMessageFilter(Predicate<GuiMessage>)` is
+  an official hook that immediately refreshes trimmed messages;
+  `ChatScreen` draws input background → chat panel → widgets (widgets on
+  top, so a widget tab bar works).
+- **Minecraft 26.3 ships unobfuscated**: its version manifest has no
+  `client_mappings`/`server_mappings` downloads. Official Mojang names
+  are runtime names, so ZEA's jar needs no intermediary remap and its
+  mixins need no refmap — documented in ARCHITECTURE.md.
+- MoulConfig 4.8.0 annotation surface verified from the jar
+  (`@Category`, `@ConfigOption`, `@ConfigEditorBoolean/Slider`, runtime
+  reflection processing); the MoulConfig base class loads in plain JUnit.
+
+### Tests performed
+
+- `./gradlew build` successful; jar contains the mixin, `zea.mixins.json`
+  and the bundled MoulConfig jar.
+- `./gradlew test`: **135 tests, 0 failures** (22 new: config defaults/
+  clamping/round-trip/corruption/migration, annotation-contract
+  structure, visible-tabs resolution, cache identity/bounds, feed
+  filter predicates).
+- In-game testing: **none.** The tab bar's rendering, hitboxes and the
+  filter's live behavior are compile- and unit-verified only; first
+  in-game verification is pending.
+
+### Design decisions
+
+1. **Official filter hook over a rendering mixin** — filtering happens
+   inside vanilla's own pipeline; ZEA adds no message-rendering mixin.
+2. **`null` filter for All** — aggregates skip the predicate entirely;
+   vanilla shows everything, including anything ZEA never classified.
+3. **Identity-keyed classification cache** — one classification per
+   message, shared by capture and display filtering; misses re-classify
+   lazily, so cache eviction can never hide a message.
+4. **Tabs anchored above the input strip** — exact, scale-independent
+   geometry (`height - 14 - TAB_HEIGHT`); panel-top anchoring would
+   depend on scaled chat geometry.
+
+### Outstanding problems
+
+- Nickname → real username resolution unresolved (Stage 4).
+- Smooth chat, search, copying, dimensions: Stage 4 remainder.
+- Tab bar width uses the unscaled chat width; users with chat scale
+  below 1 see a strip wider than the panel (cosmetic, tracked).
+- Writing-channel report on join still unverified in-game.
