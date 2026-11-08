@@ -27,6 +27,13 @@ public final class ZeaKeys {
         public static final KeyMapping SEARCH_CHAT = new KeyMapping(
                         "zea.key.search_chat", InputConstants.Type.KEYBOARD, InputConstants.UNKNOWN.getValue(), CATEGORY);
 
+        /**
+         * Toggles inventory-button editing while a container screen is
+         * open. Unbound by default — bind it once in Controls → ZEA.
+         */
+        public static final KeyMapping EDIT_BUTTONS = new KeyMapping(
+                        "zea.key.edit_buttons", InputConstants.Type.KEYBOARD, InputConstants.UNKNOWN.getValue(), CATEGORY);
+
         private ZeaKeys() {
         }
 
