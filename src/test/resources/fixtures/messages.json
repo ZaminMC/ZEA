@@ -1,0 +1,72 @@
+[
+  {
+    "family": "global",
+    "text": "🌎❣ [Yugoslavia|Pest] GavriloPrincip: lemme speak with his driver rq",
+    "category": "GLOBAL"
+  },
+  {
+    "family": "global-no-badges",
+    "text": "[Yugoslavia|Pest] GavriloPrincip: lemme speak with his driver rq",
+    "category": "GLOBAL"
+  },
+  {
+    "family": "pm-incoming",
+    "text": "[FORDaLoZ → me] hi",
+    "category": "PRIVATE_MESSAGE"
+  },
+  {
+    "family": "pm-outgoing",
+    "text": "[me → FORDaLoZ] please reply with hi",
+    "category": "PRIVATE_MESSAGE"
+  },
+  {
+    "family": "vote",
+    "text": "AdamGladio voted and received a gold crate /vote",
+    "category": "VOTE"
+  },
+  {
+    "family": "crate-win",
+    "text": "akirarocks won 16 gold from a bruh box",
+    "category": "CRATE_WIN"
+  },
+  {
+    "family": "crate-win-suffix",
+    "text": "jediknight7491 won 32 gold from a gold crate /vote",
+    "category": "CRATE_WIN"
+  },
+  {
+    "family": "death",
+    "text": "☠ xfw_x was killed by dex247",
+    "category": "DEATH"
+  },
+  {
+    "family": "death-2",
+    "text": "☠ CherryPinkVelvet was killed by FORDaLoZ",
+    "category": "DEATH"
+  },
+  {
+    "family": "system-afk-on",
+    "text": "EarthMC » You are now AFK.",
+    "category": "SYSTEM"
+  },
+  {
+    "family": "system-afk-off",
+    "text": "EarthMC » You are no longer AFK.",
+    "category": "SYSTEM"
+  },
+  {
+    "family": "writing-channel-report",
+    "text": "You are currently in global (write) and 5 other channels",
+    "category": "SYSTEM"
+  },
+  {
+    "family": "discord",
+    "text": "[Discord] message forwarded from Discord",
+    "category": "DISCORD"
+  },
+  {
+    "family": "unknown",
+    "text": "welcome to the server, enjoy your stay!",
+    "category": "UNCLASSIFIED"
+  }
+]
