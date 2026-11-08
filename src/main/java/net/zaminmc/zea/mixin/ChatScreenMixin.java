@@ -6,17 +6,23 @@ import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.ChatScreen;
+import net.minecraft.client.input.MouseButtonEvent;
+import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.zaminmc.zea.ZeaClient;
 import net.zaminmc.zea.chat.ChatSubsystem;
 import net.zaminmc.zea.chat.feeds.Feed;
 import net.zaminmc.zea.chat.feeds.FeedFilter;
 import net.zaminmc.zea.chat.feeds.Feeds;
+import net.zaminmc.zea.chat.render.ChatHitTester;
 import net.zaminmc.zea.chat.render.ChatTabBar;
+import net.zaminmc.zea.util.LegacyText;
+import com.mojang.blaze3d.platform.InputConstants;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
  * Adds ZEA's chat tab strip to the chat screen. Shown only while connected
@@ -24,6 +30,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  */
 @Mixin(ChatScreen.class)
 public abstract class ChatScreenMixin {
+	/** The alt modifier bit in the GLFW bitmask MouseEvent.modifiers() reports. */
+	private static final int ALT_MODIFIER = 4;
+
 	/** Vanilla draws the input background this far above the screen bottom. */
 	private static final int INPUT_STRIP_HEIGHT = 14;
 
