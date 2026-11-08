@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -16,6 +17,12 @@ class InventoryButtonsTest {
         @TempDir
         Path tempDir;
 
+        private final List<String> sent = new ArrayList<>();
+
+        private ButtonActivator activator() {
+                return new ButtonActivator(sent::add, 0);
+        }
+
         private static final int LEFT = 40;
         private static final int TOP = 20;
         private static final int WIDTH = 176;
@@ -24,7 +31,7 @@ class InventoryButtonsTest {
         private InventoryButtons loadedWith(String json) throws IOException {
                 Path file = tempDir.resolve("buttons.json");
                 Files.writeString(file, json, UTF_8);
-                return new InventoryButtons(file);
+                return new InventoryButtons(file, activator());
         }
 
         @Test
@@ -44,7 +51,7 @@ class InventoryButtonsTest {
 
         @Test
         void missingFileYieldsNoButtons() {
-                InventoryButtons buttons = new InventoryButtons(tempDir.resolve("absent.json"));
+                InventoryButtons buttons = new InventoryButtons(tempDir.resolve("absent.json"), activator());
 
                 assertEquals(List.of(), buttons.buttons());
         }
@@ -88,5 +95,22 @@ class InventoryButtonsTest {
                 InventoryButton hit = buttons.buttonAt(LEFT, TOP, WIDTH, HEIGHT, LEFT + 5, TOP + 5);
 
                 assertEquals("Over", hit.name(), "the button drawn on top must win the hit test");
+        }
+
+        @Test
+        void clickRunsTheButtonThroughTheActivator() throws IOException {
+                InventoryButtons buttons = loadedWith("""
+                                {
+                                  "version": 1,
+                                  "buttons": [
+                                    { "name": "Home", "command": "town spawn", "icon": "minecraft:compass" }
+                                  ]
+                                }
+                                """);
+                InventoryButton home = buttons.buttons().get(0);
+
+                assertEquals(ButtonActivator.Result.EXECUTED, buttons.click(home, 1_000));
+
+                assertEquals(List.of("town spawn"), sent);
         }
 }

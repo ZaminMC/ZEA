@@ -1,7 +1,11 @@
 package net.zaminmc.zea;
 
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.zaminmc.zea.buttons.ButtonActivator;
 import net.zaminmc.zea.buttons.InventoryButtons;
 import net.zaminmc.zea.chat.ChatSubsystem;
 import net.zaminmc.zea.chat.classify.ClassificationPipeline;
@@ -51,7 +55,20 @@ public final class ZeaClient implements ClientModInitializer {
                 lifecycle = new ClientLifecycle();
                 chat = new ChatSubsystem(lifecycle, new ClassificationPipeline(), config);
                 inventoryButtons = new InventoryButtons(
-                                FabricLoader.getInstance().getConfigDir().resolve("zea/buttons.json"));
+                                FabricLoader.getInstance().getConfigDir().resolve("zea/buttons.json"),
+                                new ButtonActivator(zea$commandSender(), ButtonActivator.DEFAULT_COOLDOWN_MILLIS));
+                ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> inventoryButtons.reset());
                 ZeaKeys.register();
+        }
+
+        /** Sends a button's command through the play connection. */
+        private static ButtonActivator.CommandSender zea$commandSender() {
+                return command -> {
+                        ClientPacketListener connection = Minecraft.getInstance().getConnection();
+                        if (connection == null) {
+                                throw new IllegalStateException("not connected to a server");
+                        }
+                        connection.sendCommand(command);
+                };
         }
 }
