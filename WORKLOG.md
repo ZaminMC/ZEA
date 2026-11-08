@@ -829,3 +829,80 @@ vanilla's own formulas, but no in-game check has happened yet.
   which are covered.
 - Share/import of button sets (`inven-` share type) is deferred to
   Stage 8 as planned; the store's per-entry policy is the foundation.
+
+## 2026-11-09 (session 7) — Fix dev.5 launch crash: inherited @Shadow
+
+### Incident
+
+User's instance (EarthSMP profile, Modrinth App, MC 26.3 + loader 0.20.1)
+crashed at launch with `dev.5` installed. The crash fired while the
+*recruitmentaddon* mod's entrypoint loaded `ChatScreen`, but the failing
+component was ZEA's `ChatScreenMixin`:
+
+```
+InvalidMixinException: @Shadow method
+addRenderableWidget(Lnet/minecraft/client/gui/components/events/GuiEventListener;)
+Lnet/minecraft/client/gui/components/events/GuiEventListener;
+in zea.mixins.json:ChatScreenMixin from mod zea
+was not located in the target class net.minecraft.client.gui.screens.ChatScreen.
+```
+
+### Root cause
+
+Mixin resolves `@Shadow` (and injection) members only against the target
+class's **own declared** members — never inherited ones.
+`addRenderableWidget` is `protected` on `Screen`, not declared on
+`ChatScreen` (verified by `javap` on the 26.3 mapped jar: exact generic
+signature exists on `Screen`). The shadow therefore failed during mixin
+apply, which killed the `ChatScreen` transformation, which aborted the
+`client` entrypoint stage — for whichever mod loaded `ChatScreen` first.
+Any later class load of `ChatScreen` would have crashed the game just the
+same; recruitmentaddon merely got there first. No ZEA behavior was at
+fault; the entrypoint failure attribution was collateral.
+
+### Work done
+
+- **Fix**: new `ScreenMixin` (targets `Screen`, where the method is
+  declared) bridges `addRenderableWidget` through the
+  `ScreenWidgetAccess` duck interface; `ChatScreenMixin` drops the
+  unresolvable shadow and calls
+  `((ScreenWidgetAccess) (Object) this).zea$addRenderableWidget(...)`.
+  JVM superclass loading guarantees the augmented `Screen` is in place
+  before any subclass code runs. The bridge delegates to the vanilla
+  method unchanged, so widget registration keeps 26.3 semantics.
+- **Regression test**: `MixinSurfaceTest` pins every mixin's target
+  surface (all `@Shadow` fields/methods, all injection points, both
+  `@WrapOperation` call targets) to members actually declared by the
+  target classes — the test that would have caught this bug class at
+  build time. Convention: a mixin change pins its new targets in the
+  same commit.
+
+### Research performed and findings
+
+- Full re-audit of the other four mixins against the 26.3 mapped jar
+  (javap): `ChatScreen` declares `input`/`init`/`keyPressed(KeyEvent)`/
+  `removed`/`mouseClicked(MouseButtonEvent, boolean)`;
+  `ChatComponent` declares `chatScrollbarPos`/`trimmedMessages`/
+  `getScale`/`getWidth`/`addMessageToDisplayQueue`/`scrollChat`/
+  `resetChatScroll`/`extractRenderState(…;DisplayMode;Z)V`/
+  `lambda$extractRenderState$1` and `ChatGraphicsAccess.fill(IIIII)V`
+  exists; `AbstractContainerScreen` declares every field and method
+  `ContainerScreenMixin` touches. No other inherited-member lookups
+  exist in ZEA's mixins — this was the only instance.
+- `ButtonEditScreen` (a real `Screen` subclass) already used
+  `this::addRenderableWidget` — compiling fine, because subclass code
+  *may* call inherited protected members. The mixin author applied the
+  same pattern where the lookup rules differ; that asymmetry was the
+  trap.
+
+### Tests performed
+
+- `./gradlew build` green; **312 tests, 0 failures** (5 new
+  `MixinSurfaceTest` methods).
+- In-game testing: none available in this environment; the mixin surface
+  is now statically pinned by the new test instead.
+
+### Outstanding problems
+
+- Unchanged from session 6 (Stage 4 leftovers, edit-screen test gap,
+  Stage 8 share/import).
