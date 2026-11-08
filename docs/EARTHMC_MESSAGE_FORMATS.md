@@ -1,13 +1,15 @@
 # EarthMC message formats
 
 Observed EarthMC chat message structures, recorded as fixtures for the
-classifier (Stage 2). These are **observed samples, not universal templates**:
-formats vary (badges come and go, towns may be absent, nicknames carry
-per-character formatting). Parsers must read component structure (styles,
-siblings, hover/click events) first and fall back to text matching only with
-declared lower confidence. Unknown messages are never dropped.
+classifier (Stage 2 — implemented, see
+[CHAT_CLASSIFICATION.md](CHAT_CLASSIFICATION.md)). These are **observed
+samples, not universal templates**: formats vary (badges come and go, towns
+may be absent, nicknames carry per-character formatting). Parsers read
+component structure first (styles, siblings, hover/click events) and anchor
+on text structure; unknown messages are never dropped.
 
-Each family below becomes a fixture file plus a regression test.
+Each family below has a fixture in `src/test/resources/fixtures/messages.json`
+and a regression test.
 
 ## Global
 
@@ -140,3 +142,19 @@ change server-side.
 
 Anything not confidently matched lands in the general/unclassified feed and
 stays visible. This is an invariant, not a fallback of last resort.
+
+## Unresolved — formats still needing captured samples
+
+The following have **no observed samples yet** and therefore no classifiers
+(they currently land in Unclassified). Add fixtures here as they are
+captured in-game:
+
+- Local channel messages.
+- Trade channel messages.
+- Nation channel messages.
+- Town channel messages.
+- The exact component tree (sibling/style structure) behind each observed
+  text format — text-level fixtures exist; component-level structure needs
+  in-game capture.
+- Whether bracket-less global messages exist (nationless/townless
+  senders).

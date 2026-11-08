@@ -31,9 +31,10 @@ communication unless the user explicitly configures it.
 - **Single source set** (`src/main/java`) with `"environment": "client"` in
   `fabric.mod.json`. ZEA is 100% client code; a split main/client source set
   would carry an empty common side forever.
-- All mixins live under `net.zaminmc.zea.mixin` and are configuration-only
-  shims: they capture state and forward it into the core. No business logic
-  lives in a mixin.
+- All mixins (when they appear) live under `net.zaminmc.zea.mixin` and are
+  configuration-only shims: they capture state and forward it into the
+  core. No business logic lives in a mixin. Message capture currently
+  needs none — Fabric's `ClientReceiveMessageEvents` is the official hook.
 
 ## 3. Module responsibilities
 

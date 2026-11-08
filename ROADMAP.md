@@ -13,7 +13,7 @@ documentation and the roadmap.
 
 **Deliverable:** reviewed architecture and permanent documentation.
 
-## Stage 1 — Core foundation ⏳ (in progress)
+## Stage 1 — Core foundation ✅
 
 Clean package boundaries, client lifecycle integration, configuration
 infrastructure (MoulConfig), persistence infrastructure (safe-write
@@ -21,20 +21,23 @@ protocol), event/message-capture boundaries, test infrastructure.
 
 Done: build toolchain (Gradle 9.8.2/Loom 1.19/Java 25, verified compiling),
 MoulConfig 4.8.0 dependency (jar-in-jar), client lifecycle (join/leave/
-stopping), EarthMC detection, safe persistence utilities, JUnit test
-infrastructure (21 passing tests).
-
-Remaining: MoulConfig config classes (as soon as features need options),
-message-capture mixin boundary (with Stage 2).
+stopping), EarthMC detection, safe persistence utilities, message capture
+via Fabric client receive events, JUnit test infrastructure. MoulConfig
+config classes are added as features begin to need options (Stage 3+).
 
 **Deliverable:** stable, testable foundation.
 
-## Stage 2 — Message model and classification
+## Stage 2 — Message model and classification ✅ (parsers pending fixtures)
 
 Capture incoming messages preserving original components; immutable
 normalized representation; EarthMC-specific classification; structured
 parsing (badges, nation/town, nicknames, events, PMs, system); unknown
 fallback; regression fixtures for every known family.
+
+Done: all of the above for every family with observed samples (14 fixture
+families, 83 tests passing). Pending: local/trade/nation/town parsers and
+component-level fixtures — blocked on in-game captured samples, tracked in
+docs/CHAT_CLASSIFICATION.md.
 
 **Deliverable:** reliable EarthMC message classification.
 

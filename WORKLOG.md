@@ -164,3 +164,75 @@ ZEA-REPO (on `main`):
 - Server identity key for history isolation unresolved (Stage 7).
 - In-game verification of the full writable channel list pending; the
   ZEA-REPO `channels` dataset allows corrections without mod releases.
+
+---
+
+## 2026-11-08 (session 2) — Stage 1 complete, Stage 2 message classification
+
+### Research performed
+
+- Verified the 26.3 chat integration surface before writing capture code:
+  Fabric API ships `ClientReceiveMessageEvents` (GAME + CHAT) in
+  `fabric-message-api-v1` 7.0.10 for 26.3 — official hooks, so **no custom
+  mixins are needed for capture**.
+- Verified the 26.3 component API: `ClickEvent`/`HoverEvent` are now
+  sealed interfaces with record implementations (`OpenUrl.uri()`,
+  `RunCommand.command()`, `ShowText.value()`); `MutableComponent` builders
+  unchanged. Minecraft `Component` classes load in plain JUnit tests, so
+  classifiers are testable without a client.
+
+### Work done
+
+- **Stage 1 completed** with `chat.capture.MessageCapture`: registers the
+  Fabric events, skips overlay (action bar) text, gates on the EarthMC
+  connection, forwards immutable captures. Wired in `ZeaClient`.
+- **Stage 2 implemented**:
+  - `chat.model`: `CapturedMessage` (original component + flattened text +
+    timestamp), `MessageCategory`, sealed `MessagePayload` (one record per
+    family + `None`), `Badge`, `Affiliation`, `ChannelChat`,
+    `PrivateMessage`, `VoteMessage`, `CrateWinMessage`, `DeathMessage`,
+    `SystemMessage`, `WritingChannelReport`, `DiscordMessage`,
+    `ClassifiedMessage`.
+  - `chat.classify`: `MessageClassifier` (binary confidence: anchored match
+    or decline), `ClassificationPipeline` (fixed order, first match wins,
+    guaranteed UNCLASSIFIED fallback), per-family classifiers, `KnownBadges`
+    (mirrors ZEA-REPO ids), `BadgeExtractor` (component-first sibling walk
+    preserving hover/click, text fallback for flat messages, unknown
+    symbols never assigned meanings).
+- **Tests**: 14 fixture families in `fixtures/messages.json` run through
+  the full pipeline; per-classifier tests for component-structure behavior
+  (badge events preserved, single-segment affiliations, nickname display
+  names, non-PM arrows, variable crate amounts, optional `/vote`,
+  death hover preservation, Discord-before-global ordering).
+
+### Tests performed
+
+- `./gradlew build` successful. `./gradlew test`: **83 tests, 0 failures**
+  (14 new fixture-pipeline assertions ×2, 27 classifier tests, 2 model
+  tests, plus the existing 21).
+- In-game testing: **none** — capture/classification runtime behavior on
+  live EarthMC is unverified; only compile + unit results are claimed.
+
+### Decisions
+
+1. **Fabric events over mixins** for capture (official integration point).
+2. **Binary confidence** — anchored patterns are always confident; the
+   guaranteed UNCLASSIFIED fallback is the safety property that matters.
+3. **Bracket required for global classification** — `Name: content` alone
+   is too weak an anchor; bracket-less messages stay unclassified rather
+   than risk misclassification.
+4. **Single-segment affiliations kept raw** — nation-vs-town is not
+   guessable from text.
+5. **KnownBadges in code for now**, mirroring ZEA-REPO ids; ZEA-REPO
+   becomes the source when the repository client exists.
+
+### Outstanding problems
+
+- Local/trade/nation/town message formats: **no observed samples** — no
+  classifiers written (documented in CHAT_CLASSIFICATION.md). Noted risk:
+  bracket-leading channel markers (`[Town] Name: msg`) would currently be
+  claimed by the global classifier; ZEA-REPO channels dataset is the
+  planned data-driven fix.
+- Component-tree structure of EarthMC messages unverified (text fixtures
+  only) — needs in-game capture.
+- Nickname → real username resolution unresolved (Stage 4).
