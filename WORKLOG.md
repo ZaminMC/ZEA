@@ -563,3 +563,126 @@ vanilla's own formulas, but no in-game check has happened yet.
   on in-game component capture; next unblocked work is Stage 5
   (notifications).
 
+
+---
+
+## 2026-11-09 (session 5) — Stage 5: notifications, mentions
+
+### Work done
+
+- **Notification coordinator** (`notify`): the single owner of the action
+  bar, title and subtitle. PM-over-mention priority (a PM preempts a
+  showing mention; a mention never preempts a PM), equal-priority
+  queueing bounded at 4 (oldest dropped first), temporary notifications
+  (mentions, 4 s), persistent ones (PM notices) that resolve by key —
+  the sender, so replying dismisses them — or expire at a hard 5-minute
+  cap, and a `clear()` for the disconnect path. All display goes through
+  a `NotificationSurface` interface; time is injected, so the policy is
+  fully unit-tested without a client.
+- **PM notifications**: incoming PMs post a persistent notice ("PM from
+  <sender>: <content>", 60-char preview); any outgoing PM to that sender
+  resolves it. Config: enable, sound, placement (action bar default,
+  title optional — both re-show every 2.5 s while a persistent notice is
+  active, just inside vanilla's ~3 s overlay fade).
+- **Mention detection** (`mention`): case-insensitive, word-boundary
+  matching of the local player's name in chat-like categories only (PM,
+  system, vote, crate and death lines never ping). Channel chat scans the
+  parsed content and excludes the speaker's own echo; Discord and
+  unclassified lines only match behind a `Name: content` separator —
+  lines that cannot be attributed never ping.
+- **Mention presentation**: gold tint (alpha 0.30, blended with the
+  line's own alpha) behind mentioned chat lines; notification with
+  40-char preview and configurable placement; experience-orb cue (pitch
+  1.0 mentions, 0.6 PMs). Highlight state is a bounded identity-keyed
+  set — the render mixin looks up `GuiMessage.Line#parent#content`,
+  the same instance capture classified, so no component is ever
+  modified.
+- **Opt-in auto-response**: off by default and inert until a response
+  text is configured; cooldown (10–300 s slider, default 30); hard
+  session cap (20 per connection, reset on disconnect); loop guard (an
+  incoming mention already containing the response text is never
+  answered, so two ZEA users cannot ping-pong); only verified writable
+  channels (global/local/trade/nation/town via the Channels table);
+  dispatches through the existing conservative router + dispatcher.
+
+### Research performed and findings
+
+- **26.3 HUD split**: titles and the action bar moved from `Gui` to the
+  new `Hud` (`Minecraft.getInstance().gui.hud`): `setOverlayMessage`
+  (60-tick display), `setTitle`/`setSubtitle`/`setTimes`/`clearTitles`.
+  Verified from the mapped jar via javap and Vineflower decompilation.
+- **Action bar lifetime**: `overlayMessageTime = 60` ticks (~3 s),
+  decremented in `Hud.tick` — measured to pick the 2.5 s refresh.
+- **Line background rendering**: `extractRenderState` draws each visible
+  line's background inside `lambda$extractRenderState$1` — one
+  `ChatGraphicsAccess.fill(IIIII)V` call per line with the lambda's
+  captured params (including the `GuiMessage.Line` and its alpha)
+  available to a `@WrapOperation` handler. The three
+  `ChatGraphicsAccess` implementations (focused, background,
+  click-capture) make the wrap safe in every mode — the click-capture
+  one's `fill` is a no-op.
+- **MoulConfig dropdowns accept enum-typed fields** (decompiled
+  `GuiOptionEditorDropdown`: `Enum.class.isAssignableFrom(clazz)` path
+  sets the constant, displays `toString()`), so placements are
+  `Notification.Destination` enums — type-safe in code, serialized by
+  name, displayed via label toString. The config structure test now
+  allows String or enum dropdowns, and pins text fields to String with
+  exactly one editor annotation per option.
+- **`SimpleSoundInstance.forUI(SoundEvents.EXPERIENCE_ORB_PICKUP,
+  pitch)`** for the cue (UI path, no world attenuation).
+- `Minecraft.getInstance().getUser().getName()` supplies the local name
+  — fetched lazily per message, since the session does not exist at mod
+  init.
+
+### Design decisions
+
+1. **Render-time tint over component wrapping.** Wrapping the displayed
+   component in a styled prefix would break the classifiers' anchored
+   parsing on re-classification and diverge from the identity-keyed
+   cache; drawing over vanilla's own per-line background rect changes
+   color only — hit-testing, search, copying and hover stay untouched.
+2. **`Name: content` attribution for unstructured lines.** EarthMC's
+   local/trade/nation/town classifiers are pending fixtures, so those
+   lines arrive unclassified; requiring the separator keeps join and
+   system lines from pinging while still catching real mentions there.
+3. **PM notices persist, mentions do not.** A mention is a 4-second
+   attention cue; a PM waits for the reply that usually ends it, with
+   the 5-minute cap as the escape hatch.
+4. **Auto-response sends through the same dispatcher as manual
+   multi-send** — one message at a time, spaced by the configured
+   interval, cancelled on disconnect — instead of a private send path.
+5. **Loop guard by text containment**: cheap, and it breaks the exact
+   ping-pong shape (each side's message contains the shared response
+   text) without heuristics about message timing.
+
+### Tests performed
+
+- `./gradlew build` successful; jar contains all new classes and the
+  mixin registration.
+- `./gradlew test`: **254 tests, 0 failures** (83 new: 18 coordinator —
+  preemption, queueing, capacity drop, persistence, refresh window,
+  hard expiry, resolve paths, disconnect clear, title times; 12
+  notifications service — PM post/resolve/preview, config gates,
+  placement; 28 mention detector — boundaries, case, self-echo,
+  category gating, unstructured attribution; 9 mentions service — fanout
+  and per-option gating; 6 highlight set — identity, eviction, clear;
+  10 auto-responder — guards, channels, session cap, reset). Config
+  structure test now also enforces single-editor and text/dropdown
+  types.
+- In-game testing: **none.** The action bar/title behavior, tint
+  visibility, sound and the controls-screen entries (new Notifications
+  and Mentions categories) need a live client; the mixin target was
+  verified against 26.3 bytecode but not against a running game.
+
+### Outstanding problems
+
+- Nickname-based mention matching remains blocked on EarthMC data (API
+  has no nicknames); nickname self-echo can false-ping until then.
+- `lambda$extractRenderState$1` is pinned to 26.3's compiled shape —
+  re-verify on any Minecraft version bump.
+- Persistent notices on the title placement re-show every 2.5 s, which
+  is assertive by design; if users report it as annoying, gate title
+  refresh behind a follow-up option.
+- Stage 4 leftovers (player hover, real-username display) stay blocked
+  on in-game component capture. Next unblocked work is Stage 6
+  (inventory buttons).

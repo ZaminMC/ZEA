@@ -226,12 +226,28 @@ feature may write to them directly. The coordinator implements the smallest
 sensible policy:
 
 - Sources declare priority (PM > mention) and duration.
-- A higher-priority notification replaces a lower one; equal priority queues.
-- Optional persistence (e.g. PM notice until replied) with explicit expiry.
+- A higher-priority notification replaces a lower one; equal priority queues
+  (bounded at 4 pending; the oldest is dropped first).
+- Persistent notifications (a PM notice) stay until resolved by key —
+  replying to that sender — or until a hard expiry (5 minutes); while one is
+  active on the action bar it is re-shown every 2.5 s, just inside vanilla's
+  ~3 s overlay fade, so it never blinks out.
 - Disconnect clears all notifications.
 
 The priority set is deliberately tiny and documented here; extending it
 requires updating this document.
+
+Mentions are detected before anything is notified: case-insensitive,
+word-boundary matches of the local player's name in the *content* of
+chat-like messages (self-echo excluded; Discord and unclassified lines only
+match when they follow the `Name: content` shape, since their structure is
+unverified). A detected mention tints the chat line's background at render
+time — the highlight keys on the message component's identity, and the
+original component is never modified. The optional auto-response is the
+only Stage 5 behavior that writes publicly, so it ships off by default,
+inert without configured text, cooldown-limited, session-capped (20),
+loop-guarded (a message already containing the response text is never
+answered) and restricted to verified writable channels.
 
 ## 12. Extension points
 

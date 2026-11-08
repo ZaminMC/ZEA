@@ -79,11 +79,25 @@ see docs/EARTHMC_API.md).
 
 **Deliverable:** modernized chat interface.
 
-## Stage 5 — Notifications
+## Stage 5 — Notifications ✅
 
 PM classification/feed/notifications, mention highlighting/sounds/destinations,
 central notification coordinator, optional automatic mention responses
 (disabled by default, loop/cooldown-guarded).
+
+Done: the notification coordinator — the single owner of the action bar,
+titles and subtitles — with PM-over-mention priority, bounded equal-priority
+queueing, persistent PM notices (until replied, hard-capped) with periodic
+refresh, and disconnect clearing; PM notifications from classified messages,
+resolved by replying; mention detection (word-boundary, case-insensitive,
+chat-content attribution with a conservative `Name: content` rule for
+unstructured messages); mention notifications with configurable destination
+and sound (experience-orb cue); gold background tinting of mentioned chat
+lines at render time (identity-keyed, original components never modified);
+and the opt-in mention auto-response — off by default, inert without text,
+cooldown-limited, session-capped, loop-guarded, and routed through the
+conservative dispatch path. Blocked pending in-game data: nickname-based
+mention matching (EarthMC's API does not expose nicknames).
 
 **Deliverable:** reliable notification system.
 
