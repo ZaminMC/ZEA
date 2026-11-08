@@ -379,7 +379,53 @@ vanilla's own formulas, but no in-game check has happened yet.
 ### Outstanding problems
 
 - Nickname → real username resolution unresolved (Stage 4).
-- Smooth chat, search, copying, dimensions: Stage 4 remainder.
+- Smooth chat, search, dimensions: Stage 4 remainder.
 - Tab bar width uses the unscaled chat width; users with chat scale
   below 1 see a strip wider than the panel (cosmetic, tracked).
 - Writing-channel report on join still unverified in-game.
+
+---
+
+## 2026-11-09 (session 4) — Copy wiring completed, confirmation toast
+
+### Problem found and fixed
+
+- Commit 432f3a6 ("Add chat message copying") had landed **incomplete**:
+  the support classes (geometry, hit-tester, legacy serializer, accessor)
+  and their tests existed, but the `mouseClicked` injection itself was
+  missing — the mixin carried only its imports and constants. Copying
+  compiled but did nothing. Rebuilt the wiring properly.
+
+### Work done
+
+- **`chat.render.ChatCopier`**: the copy policy — hit-test the cursor,
+  pick plain or legacy-formatted serialization, write the clipboard.
+  Returns `PLAIN` / `FORMATTED` / `NO_MESSAGE` so callers can leave
+  missed clicks to vanilla. `textFor` is unit-testable without a client.
+- **`chat.render.CopyToast`**: the "message copied" confirmation, shown
+  through the vanilla system toast with ZEA's own
+  `SystemToastId` token (never replaces a vanilla notification). First
+  localized strings: `assets/zea/lang/en_us.json`.
+- **`ChatScreenMixin`**: right-click copies the message under the cursor,
+  alt + right-click the formatted variant; the click is consumed only
+  when a message was hit, otherwise vanilla proceeds untouched. Verified
+  against the 26.3 signatures by javap: `ChatScreen.mouseClicked(
+  MouseButtonEvent, boolean)`, `MouseButtonEvent.{x,y,button,modifiers}`,
+  `GuiMessage.content()`, `Gui.gui.hud.getChat()`, `Gui.toastManager()`.
+- Cleaned the dead imports the incomplete commit had left behind.
+
+### Tests performed
+
+- `./gradlew build` successful; jar contains the new classes and the
+  lang file.
+- `./gradlew test`: **156 tests, 0 failures** (4 new: plain flattening,
+  formatted emission incl. the no-leading-reset rule, both-modes parity,
+  EarthMC segment round-trip).
+- In-game testing: **none.** Hit-test accuracy on a live client is still
+  the outstanding verification for the copying feature as a whole.
+
+### Outstanding problems
+
+- Unchanged from the previous session, plus: toast text is
+  English-only until more languages are contributed.
+
