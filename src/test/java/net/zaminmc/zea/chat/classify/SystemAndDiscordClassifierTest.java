@@ -15,70 +15,70 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SystemAndDiscordClassifierTest {
-        private final SystemClassifier system = new SystemClassifier();
-        private final WritingChannelReportClassifier writingReport = new WritingChannelReportClassifier();
-        private final DiscordClassifier discord = new DiscordClassifier();
-        private final ClassificationPipeline pipeline = new ClassificationPipeline();
+	private final SystemClassifier system = new SystemClassifier();
+	private final WritingChannelReportClassifier writingReport = new WritingChannelReportClassifier();
+	private final DiscordClassifier discord = new DiscordClassifier();
+	private final ClassificationPipeline pipeline = new ClassificationPipeline();
 
-        private CapturedMessage capture(String text) {
-                return CapturedMessage.of(Component.literal(text), Instant.EPOCH);
-        }
+	private CapturedMessage capture(String text) {
+		return CapturedMessage.of(Component.literal(text), Instant.EPOCH);
+	}
 
-        @Test
-        void parsesSystemMessages() {
-                var result = system.tryClassify(capture("EarthMC » You are now AFK."));
+	@Test
+	void parsesSystemMessages() {
+		var result = system.tryClassify(capture("EarthMC » You are now AFK."));
 
-                SystemMessage payload = assertInstanceOf(SystemMessage.class, result.orElseThrow().payload());
-                assertEquals("You are now AFK.", payload.content());
-        }
+		SystemMessage payload = assertInstanceOf(SystemMessage.class, result.orElseThrow().payload());
+		assertEquals("You are now AFK.", payload.content());
+	}
 
-        @Test
-        void parsesAfkOff() {
-                var result = system.tryClassify(capture("EarthMC » You are no longer AFK."));
+	@Test
+	void parsesAfkOff() {
+		var result = system.tryClassify(capture("EarthMC » You are no longer AFK."));
 
-                SystemMessage payload = assertInstanceOf(SystemMessage.class, result.orElseThrow().payload());
-                assertEquals("You are no longer AFK.", payload.content());
-        }
+		SystemMessage payload = assertInstanceOf(SystemMessage.class, result.orElseThrow().payload());
+		assertEquals("You are no longer AFK.", payload.content());
+	}
 
-        @Test
-        void declinesUnprefixedSystemText() {
-                assertTrue(system.tryClassify(capture("You are now AFK.")).isEmpty());
-        }
+	@Test
+	void declinesUnprefixedSystemText() {
+		assertTrue(system.tryClassify(capture("You are now AFK.")).isEmpty());
+	}
 
-        @Test
-        void parsesWritingChannelReport() {
-                var result = writingReport.tryClassify(capture(
-                                "You are currently in global (write) and 5 other channels"));
+	@Test
+	void parsesWritingChannelReport() {
+		var result = writingReport.tryClassify(capture(
+				"You are currently in global (write) and 5 other channels"));
 
-                WritingChannelReport payload = assertInstanceOf(WritingChannelReport.class, result.orElseThrow().payload());
-                assertEquals("global", payload.writeChannel());
-                assertEquals(5, payload.otherChannels());
-        }
+		WritingChannelReport payload = assertInstanceOf(WritingChannelReport.class, result.orElseThrow().payload());
+		assertEquals("global", payload.writeChannel());
+		assertEquals(5, payload.otherChannels());
+	}
 
-        @Test
-        void parsesDiscordPrefix() {
-                var result = discord.tryClassify(capture("[Discord] message forwarded from Discord"));
+	@Test
+	void parsesDiscordPrefix() {
+		var result = discord.tryClassify(capture("[Discord] message forwarded from Discord"));
 
-                DiscordMessage payload = assertInstanceOf(DiscordMessage.class, result.orElseThrow().payload());
-                assertEquals("message forwarded from Discord", payload.remainder());
-        }
+		DiscordMessage payload = assertInstanceOf(DiscordMessage.class, result.orElseThrow().payload());
+		assertEquals("message forwarded from Discord", payload.remainder());
+	}
 
-        @Test
-        void discordIsNotClassifiedAsGlobalChat() {
-                // "[Discord] Author: content" would otherwise parse as an
-                // affiliation bracket followed by a display name.
-                var classified = pipeline.classify(capture("[Discord] Author: content"));
+	@Test
+	void discordIsNotClassifiedAsGlobalChat() {
+		// "[Discord] Author: content" would otherwise parse as an
+		// affiliation bracket followed by a display name.
+		var classified = pipeline.classify(capture("[Discord] Author: content"));
 
-                assertEquals(MessageCategory.DISCORD, classified.category());
-        }
+		assertEquals(MessageCategory.DISCORD, classified.category());
+	}
 
-        @Test
-        void writingChannelReportBeatsGenericSystemMatch() {
-                var result = writingReport.tryClassify(capture(
-                                "You are currently in local (write) and 2 other channels"));
+	@Test
+	void writingChannelReportBeatsGenericSystemMatch() {
+		var result = writingReport.tryClassify(capture(
+				"You are currently in local (write) and 2 other channels"));
 
-                WritingChannelReport payload = assertInstanceOf(WritingChannelReport.class, result.orElseThrow().payload());
-                assertEquals("local", payload.writeChannel());
-                assertEquals(2, payload.otherChannels());
-        }
+		WritingChannelReport payload = assertInstanceOf(WritingChannelReport.class, result.orElseThrow().payload());
+		assertEquals("local", payload.writeChannel());
+		assertEquals(2, payload.otherChannels());
+	}
 }
