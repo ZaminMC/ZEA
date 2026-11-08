@@ -1,0 +1,5 @@
+{
+	"zea.chat.copy.title": "Message copied",
+	"zea.chat.copy.plain": "Plain text is on the clipboard.",
+	"zea.chat.copy.formatted": "Formatted text (with color codes) is on the clipboard."
+}
