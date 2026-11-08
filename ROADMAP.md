@@ -61,10 +61,12 @@ wiring. See docs/CHAT_CHANNELS.md.
 Smooth chat, search (Ctrl+F), message copying, chat dimensions, configurable
 appearance, player hover presentation, real-username display option.
 
-Done: chat tab bar (EarthMC-only, flat design) and feed filtering through
-the official `setVisibleMessageFilter` hook, with an identity-keyed
-classification cache. Remaining: smooth chat, search, copying, dimensions,
-player hover, username option.
+Done: chat tab bar (EarthMC-only, flat design), feed filtering through
+the official `setVisibleMessageFilter` hook (identity-keyed classification
+cache), and message copying (right-click plain, alt+right-click formatted,
+legacy serializer included). Remaining: smooth chat, search, copy
+confirmation toast, configurable controls, dimensions, player hover,
+username option.
 
 **Deliverable:** modernized chat interface.
 

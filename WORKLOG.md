@@ -355,6 +355,27 @@ ZEA-REPO (on `main`):
    geometry (`height - 14 - TAB_HEIGHT`); panel-top anchoring would
    depend on scaled chat geometry.
 
+
+### Late addition (same session) — message copying
+
+- **`util.LegacyText`**: Component → legacy `§`-code serializer (26.3 ships
+  none). Style runs emit `§r` + full code set on change, mirroring how
+  EarthMC emits segments; inherited child styles produce no extra codes;
+  non-legacy colors are skipped.
+- **`chat.render.ChatGeometry` + `ChatHitTester`**: the vanilla line
+  geometry mirrored from ChatComponent's bytecode (`chatBottom =
+  floor((guiHeight - 40) / scale)`, entry metrics, text-region slot math),
+  plus accessor reads (`ChatComponentAccessor`) of the live line list and
+  scroll position.
+- **`ChatScreenMixin`**: right-click copies the message under the cursor,
+  alt + right-click copies the formatted variant. Clicks not over a
+  message fall through to vanilla.
+
+Tests: **152 total, 0 failures** (LegacyText emission rules including the
+observed EarthMC segment style; geometry boundaries and slot stacking).
+In-game hit-test accuracy remains **unverified** — the math mirrors
+vanilla's own formulas, but no in-game check has happened yet.
+
 ### Outstanding problems
 
 - Nickname → real username resolution unresolved (Stage 4).
