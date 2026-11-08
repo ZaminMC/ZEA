@@ -6,8 +6,12 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.zaminmc.zea.ZeaClient;
 import net.zaminmc.zea.chat.capture.MessageCapture;
+import net.zaminmc.zea.chat.classify.ClassificationCache;
 import net.zaminmc.zea.chat.classify.ClassificationPipeline;
 import net.zaminmc.zea.chat.feeds.ChannelState;
+import net.zaminmc.zea.chat.feeds.FeedFilter;
+import net.zaminmc.zea.chat.feeds.FeedSelection;
+import net.zaminmc.zea.chat.feeds.Feeds;
 import net.zaminmc.zea.chat.feeds.MultiChannelDispatcher;
 import net.zaminmc.zea.chat.feeds.MultiSendResult;
 import net.zaminmc.zea.chat.feeds.OutgoingMessage;
@@ -27,13 +31,17 @@ import net.zaminmc.zea.lifecycle.ClientLifecycle;
  */
 public final class ChatSubsystem {
 	private final ClassificationPipeline classification;
+	private final ClassificationCache classifications;
 	private final ZeaConfig config;
 	private final OutgoingRouter router = new OutgoingRouter();
 	private final ChannelState channelState = new ChannelState();
+	private final FeedSelection feedSelection = new FeedSelection(Feeds.ALL);
+	private final FeedFilter feedFilter = new FeedFilter(classifications(), feedSelection);
 	private final MultiChannelDispatcher dispatcher;
 
 	public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification, ZeaConfig config) {
 		this.classification = classification;
+		this.classifications = new ClassificationCache(classification, 512);
 		this.config = config;
 		this.dispatcher = new MultiChannelDispatcher(
 				this::sendCommand,
@@ -45,6 +53,10 @@ public final class ChatSubsystem {
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
 			dispatcher.cancel();
 			channelState.clear();
+			// Display state is EarthMC context; leaving resets it so the
+			// vanilla chat is untouched on other servers.
+			feedSelection.select(Feeds.ALL);
+			feedFilter.apply(client.gui.hud.getChat());
 		});
 
 		new MessageCapture(lifecycle::onEarthMc, this::onCaptured);
@@ -52,7 +64,7 @@ public final class ChatSubsystem {
 
 	/** Classified stream entry point; feeds/history/notifications subscribe here in later stages. */
 	private void onCaptured(CapturedMessage captured) {
-		ClassifiedMessage classified = classification.classify(captured);
+		ClassifiedMessage classified = classifications.classify(captured);
 		if (classified.payload() instanceof WritingChannelReport report) {
 			channelState.applyReport(report);
 		}
@@ -77,6 +89,18 @@ public final class ChatSubsystem {
 
 	public ChannelState channelState() {
 		return channelState;
+	}
+
+	public ClassificationCache classifications() {
+		return classifications;
+	}
+
+	public FeedSelection feedSelection() {
+		return feedSelection;
+	}
+
+	public FeedFilter feedFilter() {
+		return feedFilter;
 	}
 
 	public MultiChannelDispatcher dispatcher() {

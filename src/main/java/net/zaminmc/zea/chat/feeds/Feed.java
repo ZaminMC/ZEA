@@ -24,4 +24,13 @@ public record Feed(String id, String label, Set<MessageCategory> categories) {
 	public boolean shows(ClassifiedMessage message) {
 		return categories.contains(message.category());
 	}
+
+	/**
+	 * Whether this feed shows every category, including unclassified
+	 * messages — true only for aggregates like All. Such feeds can skip
+	 * chat filtering entirely and let vanilla show everything.
+	 */
+	public boolean showsEverything() {
+		return categories.size() == MessageCategory.values().length;
+	}
 }

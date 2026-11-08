@@ -34,7 +34,13 @@ communication unless the user explicitly configures it.
 - All mixins (when they appear) live under `net.zaminmc.zea.mixin` and are
   configuration-only shims: they capture state and forward it into the
   core. No business logic lives in a mixin. Message capture currently
-  needs none — Fabric's `ClientReceiveMessageEvents` is the official hook.
+  needs none — Fabric's `ClientReceiveMessageEvents` is the official hook;
+  the chat tab strip uses one `ChatScreenMixin` to add its widget.
+- **Mixins need no refmap.** Minecraft 26.3 ships unobfuscated (its version
+  manifest has no `client_mappings`/`server_mappings` downloads), so the
+  official Mojang names ZEA compiles against are the runtime names. Loom
+  performs no intermediary remap and the built jar works as-is; annotation
+  strings like `method = "init"` are valid in production.
 
 ## 3. Module responsibilities
 

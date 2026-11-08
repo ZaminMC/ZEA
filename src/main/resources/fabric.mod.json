@@ -1,27 +1,30 @@
 {
-	"schemaVersion": 1,
-	"id": "zea",
-	"version": "${version}",
-	"name": "ZEA",
-	"description": "Zamin's EarthMC Addon - an all-in-one client-side EarthMC companion.",
-	"authors": [
-		"Abasing \"Zamin\""
-	],
-	"contact": {
-		"homepage": "https://github.com/ZaminMC",
-		"sources": "https://github.com/ZaminMC/ZEA"
-	},
-	"license": "LGPL-3.0-or-later",
-	"environment": "client",
-	"entrypoints": {
-		"client": [
-			"net.zaminmc.zea.ZeaClient"
-		]
-	},
-	"depends": {
-		"fabricloader": ">=0.20.1",
-		"minecraft": "~26.3",
-		"java": ">=25",
-		"fabric-api": "*"
-	}
+        "schemaVersion": 1,
+        "id": "zea",
+        "version": "${version}",
+        "name": "ZEA",
+        "description": "Zamin's EarthMC Addon - an all-in-one client-side EarthMC companion.",
+        "authors": [
+                "Abasing \"Zamin\""
+        ],
+        "contact": {
+                "homepage": "https://github.com/ZaminMC",
+                "sources": "https://github.com/ZaminMC/ZEA"
+        },
+        "license": "LGPL-3.0-or-later",
+        "environment": "client",
+        "mixins": [
+                "zea.mixins.json"
+        ],
+        "entrypoints": {
+                "client": [
+                        "net.zaminmc.zea.ZeaClient"
+                ]
+        },
+        "depends": {
+                "fabricloader": ">=0.20.1",
+                "minecraft": "~26.3",
+                "java": ">=25",
+                "fabric-api": "*"
+        }
 }
