@@ -18,3 +18,6 @@ bin/
 # Fabric
 run/
 remappedSrc/
+
+# Test-run log output
+logs/
