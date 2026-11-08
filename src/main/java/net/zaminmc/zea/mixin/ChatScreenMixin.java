@@ -2,9 +2,6 @@ package net.zaminmc.zea.mixin;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.EditBox;
-import net.minecraft.client.gui.components.Renderable;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -45,10 +42,6 @@ public abstract class ChatScreenMixin {
         /** The search field of the currently built screen; rebuilt on resize. */
         private ChatSearchBar zea$searchBar;
 
-        @Shadow
-        protected abstract <T extends GuiEventListener & Renderable & NarratableEntry> T addRenderableWidget(
-                        T widget);
-
         @Inject(method = "init", at = @At("TAIL"))
         private void zea$addChatTabs(CallbackInfo ci) {
                 ChatSubsystem chat = ZeaClient.chat();
@@ -70,7 +63,9 @@ public abstract class ChatScreenMixin {
                                         chat.feedSelection().select(feed);
                                         filter.apply(minecraft.gui.hud.getChat());
                                 });
-                addRenderableWidget(tabBar);
+                // addRenderableWidget is protected on Screen and inherited, so it
+                // cannot be @Shadowed here — ScreenMixin exposes it instead.
+                ((ScreenWidgetAccess) (Object) this).zea$addRenderableWidget(tabBar);
 
                 zea$searchBar = new ChatSearchBar(
                                 minecraft.font,
@@ -88,7 +83,7 @@ public abstract class ChatScreenMixin {
                         filter.setSearchQuery(text);
                         filter.apply(minecraft.gui.hud.getChat());
                 });
-                addRenderableWidget(zea$searchBar);
+                ((ScreenWidgetAccess) (Object) this).zea$addRenderableWidget(zea$searchBar);
         }
 
         /**
