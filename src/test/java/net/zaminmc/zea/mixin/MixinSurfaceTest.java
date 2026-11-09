@@ -11,6 +11,10 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
+import net.minecraft.client.multiplayer.chat.GuiMessageSource;
+import net.minecraft.client.multiplayer.chat.GuiMessageTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MessageSignature;
 import org.joml.Matrix3x2fStack;
 import org.junit.jupiter.api.Test;
 
@@ -54,9 +58,17 @@ class MixinSurfaceTest {
 	void chatMembersTargetedByChatComponentMixinAreDeclaredByChatComponent() {
 		declaredField(ChatComponent.class, int.class, "chatScrollbarPos");
 		declaredField(ChatComponent.class, List.class, "trimmedMessages");
+		declaredField(ChatComponent.class, boolean.class, "newMessageSinceScroll");
 		declaredMethod(ChatComponent.class, "getScale");
 		declaredMethod(ChatComponent.class, "getWidth");
+		// The ingest path the retention wrap guards, and the private
+		// store it calls for messages ZEA's filters hide.
+		declaredMethod(ChatComponent.class, "addMessage",
+				Component.class, MessageSignature.class, GuiMessageSource.class, GuiMessageTag.class);
 		declaredMethod(ChatComponent.class, "addMessageToDisplayQueue", GuiMessage.class);
+		declaredMethod(ChatComponent.class, "addMessageToQueue", GuiMessage.class);
+		// The bulk rebuild the scroll-stability bracket wraps.
+		declaredMethod(ChatComponent.class, "refreshTrimmedMessages");
 		declaredMethod(ChatComponent.class, "scrollChat", int.class);
 		declaredMethod(ChatComponent.class, "resetChatScroll");
 		declaredMethod(ChatComponent.class, "extractRenderState",

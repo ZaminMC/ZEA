@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FeedFilterTest {
@@ -119,6 +120,51 @@ class FeedFilterTest {
 	@Test
 	void allTabUsesNoFilterSoVanillaShowsEverything() {
 		assertNull(filter.currentFilter());
+	}
+
+	/**
+	 * A filter without its classification service must never exist: the
+	 * dev.23 live crash was a FeedFilter constructed with a null cache
+	 * (ChatSubsystem's field initializer ran before the constructor body
+	 * assigned the cache), and its predicate then dereferenced null inside
+	 * vanilla's packet path — a disconnect. The constructor now fails
+	 * fast, so a wiring mistake dies at startup where it is debuggable.
+	 */
+	@Test
+	void feedFilterRequiresItsCacheAndSelection() {
+		assertThrows(NullPointerException.class, () -> new FeedFilter(null, selection));
+		assertThrows(NullPointerException.class, () -> new FeedFilter(cache, null));
+	}
+
+	/**
+	 * Every state installs an {@link FeedFilter.Installed} predicate, so
+	 * the retention wrap in ChatComponentMixin can tell ZEA's filters
+	 * from vanilla's and other mods' and retain only what ZEA hides.
+	 */
+	@Test
+	void installedFilterIsAlwaysZeaOwned() {
+		assertTrue(filter.installableFilter() instanceof FeedFilter.Installed);
+
+		filter.setSearchQuery("");
+		assertTrue(filter.installableFilter() instanceof FeedFilter.Installed);
+
+		selection.select(Feeds.VOTES);
+		assertTrue(filter.installableFilter() instanceof FeedFilter.Installed);
+
+		filter.setSearchQuery("gold");
+		assertTrue(filter.installableFilter() instanceof FeedFilter.Installed);
+	}
+
+	@Test
+	void installedWrapperDelegatesToTheComposedFilter() {
+		selection.select(Feeds.VOTES);
+		filter.setSearchQuery("gold");
+
+		Predicate<GuiMessage> installed = filter.installableFilter();
+
+		assertTrue(installed.test(message("AdamGladio voted and received a gold crate /vote")));
+		assertFalse(installed.test(message("[Germany|Berlin] KoenigLuis: selling gold cheap")));
+		assertFalse(installed.test(message("AdamGladio voted and received a silver crate /vote")));
 	}
 
 	/**

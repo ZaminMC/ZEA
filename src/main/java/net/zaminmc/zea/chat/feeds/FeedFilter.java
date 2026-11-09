@@ -5,14 +5,30 @@ import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.zaminmc.zea.chat.classify.ClassificationCache;
 
 import java.util.Locale;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
  * Applies the selected display feed — and, while a chat search is open,
  * its query — to the vanilla chat as its official
- * {@code visibleMessageFilter}. Filtering is visual only — every message
- * stays in the chat history, so switching back to the All tab (or any
- * other feed) shows them again.
+ * {@code visibleMessageFilter}. Switching feeds and searches must be
+ * reversible: every message stays retrievable, so returning to the All
+ * tab (or any other feed) shows the full history again.
+ *
+ * <p>Vanilla, however, applies the filter as an <b>ingest gate</b>:
+ * {@code ChatComponent.addMessage} returns before its store calls when
+ * the filter rejects, so a message hidden by the selected feed would be
+ * dropped from the chat entirely — nothing retains it, and switching
+ * back to All could not restore it (verified against the 26.3 bytecode:
+ * the reject branch skips both {@code addMessageToDisplayQueue} and
+ * {@code addMessageToQueue}). ZEA therefore installs only
+ * {@link Installed} predicates, and ChatComponentMixin's retention wrap
+ * stores a message an {@code Installed} predicate rejected into
+ * {@code allMessages} before vanilla drops it: hidden from the display
+ * list now, retained for every later feed, search and the All
+ * aggregate. The wrap ignores any filter ZEA did not install —
+ * vanilla's own chat-trust filter and other mods' filters keep vanilla's
+ * drop semantics untouched.
  *
  * <p>The All tab contributes no feed predicate of its own, which also
  * restores messages ZEA never classified (shown by vanilla as usual); a
@@ -24,6 +40,14 @@ import java.util.function.Predicate;
  * bytecode), so installing null makes the next incoming message throw and
  * drop the connection. {@link #installableFilter()} therefore maps
  * "nothing filters" to an always-true predicate instead of null.
+ *
+ * <p>The classification cache is required at construction and the
+ * constructor fails fast on null — a filter without its classification
+ * service must never exist. (The dev.23 live crash was exactly that:
+ * {@code ChatSubsystem}'s field initializer built this filter before its
+ * constructor body assigned the cache, so the filter held null and the
+ * first tab click or incoming message dereferenced it. The construction
+ * order is now pinned by {@code ChatSubsystemWiringTest}.)
  *
  * <p>The search query is held here — not in the chat screen — so it is
  * the single source of truth that survives screen rebuilds (window
@@ -39,8 +63,8 @@ public final class FeedFilter {
 	private String searchQuery;
 
 	public FeedFilter(ClassificationCache cache, FeedSelection selection) {
-		this.cache = cache;
-		this.selection = selection;
+		this.cache = Objects.requireNonNull(cache, "cache must not be null");
+		this.selection = Objects.requireNonNull(selection, "selection must not be null");
 	}
 
 	/** The active search query, or {@code null} when the search is closed. */
@@ -79,10 +103,12 @@ public final class FeedFilter {
 	 * {@link #currentFilter()}, except "nothing filters" becomes an
 	 * always-true predicate instead of {@code null}, because vanilla's
 	 * chat crashes on a null filter when the next message arrives.
+	 * Always an {@link Installed} wrapper so the retention wrap in
+	 * ChatComponentMixin can recognize ZEA's filters.
 	 */
-	public Predicate<GuiMessage> installableFilter() {
+	public Installed installableFilter() {
 		Predicate<GuiMessage> filter = currentFilter();
-		return filter != null ? filter : SHOW_EVERYTHING;
+		return new Installed(filter != null ? filter : SHOW_EVERYTHING);
 	}
 
 	/** Installs (or clears) the filter on the live chat component. */
@@ -105,5 +131,26 @@ public final class FeedFilter {
 		}
 		String needle = query.toLowerCase(Locale.ROOT);
 		return message -> message.content().getString().toLowerCase(Locale.ROOT).contains(needle);
+	}
+
+	/**
+	 * The predicate shape ZEA installs as the vanilla chat filter. A
+	 * plain delegating wrapper: its only job is to be recognizably
+	 * ZEA's, so the retention wrap in ChatComponentMixin can store away
+	 * the messages these predicates reject without touching the drop
+	 * semantics of any other filter that ever occupies the field
+	 * (vanilla's chat-trust filter, other mods').
+	 */
+	public static final class Installed implements Predicate<GuiMessage> {
+		private final Predicate<GuiMessage> delegate;
+
+		Installed(Predicate<GuiMessage> delegate) {
+			this.delegate = Objects.requireNonNull(delegate, "delegate must not be null");
+		}
+
+		@Override
+		public boolean test(GuiMessage message) {
+			return delegate.test(message);
+		}
 	}
 }

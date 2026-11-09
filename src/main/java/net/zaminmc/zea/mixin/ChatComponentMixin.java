@@ -9,6 +9,7 @@ import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.util.FormattedCharSequence;
 import net.zaminmc.zea.ZeaClient;
+import net.zaminmc.zea.chat.feeds.FeedFilter;
 import net.zaminmc.zea.chat.render.ChatGeometry;
 import net.zaminmc.zea.chat.render.SmoothChat;
 import org.joml.Matrix3x2fStack;
@@ -19,6 +20,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * Smooth chat: whenever the chat's scroll anchor jumps — a new message
@@ -40,18 +42,35 @@ public abstract class ChatComponentMixin {
 	private int chatScrollbarPos;
 
 	@Shadow
+	private boolean newMessageSinceScroll;
+
+	@Shadow
 	private double getScale() {
+		throw new AssertionError();
+	}
+
+	@Shadow
+	private void addMessageToQueue(GuiMessage message) {
+		throw new AssertionError();
+	}
+
+	@Shadow
+	public void scrollChat(int direction) {
 		throw new AssertionError();
 	}
 
 	private final SmoothChat zea$smoothChat = new SmoothChat();
 	/** Set while addMessageToDisplayQueue runs, to skip its internal pin scroll. */
 	private boolean zea$inAddMessage;
+	/** Set while refreshTrimmedMessages rebuilds the display list. */
+	private boolean zea$inRefresh;
 	/** The anchor before the add, and the line count of the message being added. */
 	private int zea$barBeforeAdd;
 	private int zea$pendingLines;
 	/** Shared before-capture for scrollChat and resetChatScroll. */
 	private int zea$barBeforeScroll;
+	/** The scroll anchor refreshTrimmedMessages started from. */
+	private int zea$scrollBeforeRefresh;
 
 	/**
 	 * Counts the wrapped lines of each added message; needed because the
@@ -69,6 +88,9 @@ public abstract class ChatComponentMixin {
 
 	@Inject(method = "addMessageToDisplayQueue", at = @At("HEAD"))
 	private void zea$captureBeforeAdd(GuiMessage message, CallbackInfo ci) {
+		if (zea$inRefresh) {
+			return;
+		}
 		if (zea$smoothChatActive()) {
 			zea$inAddMessage = true;
 			zea$barBeforeAdd = chatScrollbarPos;
@@ -84,6 +106,12 @@ public abstract class ChatComponentMixin {
 	@Inject(method = "addMessageToDisplayQueue", at = @At("TAIL"))
 	private void zea$animateNewMessage(GuiMessage message, CallbackInfo ci) {
 		zea$inAddMessage = false;
+		if (zea$inRefresh) {
+			// A rebuild re-adds every message; none of them is
+			// "new", so none of them glides.
+			zea$pendingLines = 0;
+			return;
+		}
 		if (zea$smoothChatActive() && zea$barBeforeAdd == 0 && chatScrollbarPos == 0 && zea$pendingLines > 0) {
 			zea$smoothChat.shift(zea$pendingLines * zea$lineHeight(),
 					System.currentTimeMillis(), zea$durationMillis());
@@ -98,7 +126,7 @@ public abstract class ChatComponentMixin {
 
 	@Inject(method = "scrollChat", at = @At("TAIL"))
 	private void zea$animateScroll(int notches, CallbackInfo ci) {
-		if (zea$inAddMessage || !zea$smoothChatActive()) {
+		if (zea$inAddMessage || zea$inRefresh || !zea$smoothChatActive()) {
 			return;
 		}
 		int lines = zea$barBeforeScroll - chatScrollbarPos;
@@ -110,6 +138,10 @@ public abstract class ChatComponentMixin {
 
 	@Inject(method = "resetChatScroll", at = @At("HEAD"))
 	private void zea$captureBeforeReset(CallbackInfo ci) {
+		// resetChatScroll never runs inside a refresh, so this is a
+		// safe point to clear a refresh flag an exception left set
+		// (a third-party filter that throws inside the rebuild).
+		zea$inRefresh = false;
 		zea$barBeforeScroll = chatScrollbarPos;
 	}
 
@@ -124,6 +156,60 @@ public abstract class ChatComponentMixin {
 			zea$smoothChat.shift(lines * zea$lineHeight(),
 					System.currentTimeMillis(), zea$durationMillis());
 		}
+	}
+
+	/**
+	 * Vanilla applies the visible-message filter as an ingest gate:
+	 * {@code addMessage} returns before its store calls when the filter
+	 * rejects, so a message hidden by the selected feed would vanish
+	 * from the chat entirely — {@code allMessages} never receives it,
+	 * and switching back to All could not restore it (verified against
+	 * the 26.3 bytecode). When the installed filter is ZEA's, store the
+	 * rejected message into {@code allMessages} before vanilla drops
+	 * it: hidden from the display list now, retained for every other
+	 * feed and the All aggregate. Any other filter (vanilla's own
+	 * chat-trust filter, other mods') keeps vanilla's drop semantics —
+	 * the wrap is then a pure passthrough.
+	 */
+	@WrapOperation(method = "addMessage", at = @At(value = "INVOKE",
+			target = "Ljava/util/function/Predicate;test(Ljava/lang/Object;)Z"))
+	private boolean zea$retainMessagesHiddenByZeaFilters(Predicate<GuiMessage> filter, Object message,
+			Operation<Boolean> original) {
+		boolean shown = original.call(filter, message);
+		if (!shown && filter instanceof FeedFilter.Installed) {
+			addMessageToQueue((GuiMessage) message);
+		}
+		return shown;
+	}
+
+	/**
+	 * A bulk rebuild is not an append: the per-line scroll compensation
+	 * {@code addMessageToDisplayQueue} applies (one notch per line while
+	 * the chat is open and scrolled up) exists to keep single new
+	 * messages steady, and across a whole rebuild it inflates the anchor
+	 * until it clamps against the new list — the view jumps toward the
+	 * oldest messages on every tab switch. Remember the anchor before
+	 * the rebuild and restore it after, letting vanilla's own
+	 * {@code scrollChat(0)} re-clamp it to the new list. The smooth-chat
+	 * hooks check {@code zea$inRefresh} so a rebuilt message never
+	 * counts as new or as scrolling. Off EarthMC this is inert: vanilla's
+	 * own filter toggles keep their behavior byte-for-byte.
+	 */
+	@Inject(method = "refreshTrimmedMessages", at = @At("HEAD"))
+	private void zea$rememberScrollBeforeRefresh(CallbackInfo ci) {
+		zea$inRefresh = true;
+		zea$scrollBeforeRefresh = chatScrollbarPos;
+	}
+
+	@Inject(method = "refreshTrimmedMessages", at = @At("TAIL"))
+	private void zea$restoreScrollAfterRefresh(CallbackInfo ci) {
+		zea$inRefresh = false;
+		if (!zea$onEarthMc()) {
+			return;
+		}
+		chatScrollbarPos = zea$scrollBeforeRefresh;
+		newMessageSinceScroll = false;
+		scrollChat(0);
 	}
 
 	/**
@@ -149,6 +235,10 @@ public abstract class ChatComponentMixin {
 		return ZeaClient.chat() != null
 				&& ZeaClient.lifecycle().onEarthMc()
 				&& ZeaClient.config().smoothChatEnabled();
+	}
+
+	private boolean zea$onEarthMc() {
+		return ZeaClient.chat() != null && ZeaClient.lifecycle().onEarthMc();
 	}
 
 	private int zea$durationMillis() {
