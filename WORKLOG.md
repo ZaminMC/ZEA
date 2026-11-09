@@ -1443,3 +1443,101 @@ defect in the mixin surface.
   OneConfig's chat events). MixinExtras chains wraps through the
   `Operation` interface, so coexistence should be structural; the
   player's log will tell.
+
+## 2026-11-09 — Paste service: live verification and the real hostname
+
+### What happened
+
+The share backend had never touched the real service — the development
+sandbox could not resolve the hostname (NXDOMAIN, recorded in
+docs/PASTE_SERVICE.md as pending verification). A manual
+`live checks` workflow (`.github/workflows/live-checks.yml`, dispatch
+only) was added to run environment-blocked verifications from GitHub's
+runners — and it failed too: `paste.helpcha.at` does not resolve from
+public resolvers (Google, Cloudflare) or CI runners either.
+
+The spec's hostname was wrong, not the network. HelpChat's domain is
+the short form `helpch.at`; the paste service lives at
+`paste.helpch.at`, and it answers the exact protocol ZEA implements:
+
+- `POST /documents` with `Content-Type: text/plain; charset=utf-8` and
+  the document as the body → `200` with `{"key":"..."}`; keys observed
+  (10 chars, alphanumeric) match the `[A-Za-z0-9_-]+` whitelist.
+- `GET /raw/{key}` → direct `200` (no redirect),
+  `text/plain; charset=UTF-8`, byte-identical round-trip including
+  multibyte (`café ☃ — ünïcode ✓` in a real `zea-share` envelope).
+- Presentation URL `/{key}` and the `.java` extension form both answer
+  `200` — the extension really is presentation-only.
+
+All verified by hand from the sandbox (the domain resolves fine here —
+only the old spelling didn't) and independently by the live-checks
+workflow's green run.
+
+### Fix
+
+`PasteKey.HOST` is now `paste.helpch.at` (BASE_URL derives), with the
+hostname spelled out in code, tests, docs and the workflow. The worklog
+entries mentioning the old spelling stand as history.
+
+### Outstanding problems
+
+- None for the protocol. In-game sharing still wants one live pass
+  (upload from the game, import on another client) with the next
+  dev-build run.
+
+## 2026-11-09 — The tab strip stays inside the chat panel
+
+### Context
+
+Tracked cosmetic defect since the tab bar landed: the strip could
+extend past the chat panel's right edge — read, at the time, as "uses
+the unscaled chat width; visible when chat scale is below 1".
+
+### Root cause — and a correction
+
+The 26.3 bytecode settles the actual geometry, and the old note had it
+backwards. `ChatComponent.getWidth()` is
+`floor(chatWidthOption * 280 + 40)` and the renderer works in scaled
+coordinates (`pose.scale(scale)`, layout widths `ceil(getWidth() /
+scale)`), so the panel's **on-screen** width is `getWidth()` —
+independent of chat scale. Smaller chat scale shrinks the glyphs and
+re-wraps the lines, not the panel box. The strip, meanwhile, was
+bounded only by the screen width, so it overhung the panel whenever the
+enabled tabs were wider than the player's chat width setting (default
+panel 320 px; all extra feeds enabled ≈ 500 px — reachable at any
+scale).
+
+### Fix
+
+- `TabLayout` (new, `chat/render`) — the strip's layout policy as a
+  pure computation: natural fit → padding compressed toward a 1 px
+  floor → labels shortened one character at a time, widest tab first,
+  with an ellipsis, never below one character. If even that cannot
+  fit, the minimum layout overflows rather than dropping tabs: drawn
+  extent always equals hit-test extent, so no tab can ever become dead
+  pixels.
+- `ChatTabBar` — consumes the layout; a shortened label gets the full
+  one as a hover tooltip (narration already carried it).
+- `ChatScreenMixin` — the strip's max width is
+  `min(screen.width - 4, ChatComponent.getWidth(chatWidthOption))`,
+  vanilla's own public static, so the strip is clamped to the panel's
+  actual on-screen width by construction. The search field stays
+  full-width deliberately: it is a text-entry affordance, matching the
+  vanilla input strip below it.
+
+### Tests performed
+
+- `./gradlew build` green; 508 tests, 0 failures (was 499).
+  `TabLayoutTest` (9 tests) pins the ladder: natural fit, padding
+  compression before shortening (including Java's truncating division
+  at the floor), longest-first shortening with the ellipsis cost, the
+  one-character floor, single-character labels never shortened, empty
+  and single-tab edges, and the documented overflow.
+- In-game verification pending the next dev-build run (a cosmetic
+  render fix; the logic is pure and pinned).
+
+### Outstanding problems
+
+- In-game verification of the whole chat surface (tabs, search, copy,
+  multi-send, mention tint) still pending the player's next session —
+  dev.21 carries this and the paste hostname fix.
