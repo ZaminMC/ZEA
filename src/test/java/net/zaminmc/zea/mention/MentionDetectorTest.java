@@ -9,12 +9,14 @@ import net.zaminmc.zea.chat.model.DiscordMessage;
 import net.zaminmc.zea.chat.model.MessageCategory;
 import net.zaminmc.zea.chat.model.MessagePayload;
 import net.zaminmc.zea.chat.model.PrivateMessage;
+import net.zaminmc.zea.chat.model.TaggedChannelChat;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -100,6 +102,19 @@ class MentionDetectorTest {
         }
 
         @Test
+        void detectsMentionInTaggedChannelChat() {
+                var mention = detector.detect(nationChat("Sosnovka", "Coriolanus", "hey Zamin"), ME);
+
+                assertEquals("Coriolanus", mention.orElseThrow().speaker());
+                assertEquals("hey Zamin", mention.orElseThrow().content());
+        }
+
+        @Test
+        void ownEchoInTaggedChannelChatDoesNotPing() {
+                assertTrue(detector.detect(nationChat("Sosnovka", "Zamin", "I am Zamin"), ME).isEmpty());
+        }
+
+        @Test
         void unstructuredRequiresSeparator() {
                 // No "Name: content" shape -> cannot attribute -> no ping.
                 assertTrue(detector.detect(unclassified("Zamin joined the town Athens"), ME).isEmpty());
@@ -157,6 +172,13 @@ class MentionDetectorTest {
                 return new ClassifiedMessage(
                                 capture("[Nation|Town] " + speaker + ": " + content),
                                 MessageCategory.GLOBAL, chat);
+        }
+
+        private ClassifiedMessage nationChat(String town, String speaker, String content) {
+                TaggedChannelChat chat = new TaggedChannelChat("Nation Chat", Optional.of(town), speaker, content);
+                return new ClassifiedMessage(
+                                capture("[Nation Chat|" + town + "] " + speaker + ": " + content),
+                                MessageCategory.NATION, chat);
         }
 
         private ClassifiedMessage discord(String text) {

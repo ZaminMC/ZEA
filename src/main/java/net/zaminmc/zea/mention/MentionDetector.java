@@ -4,6 +4,7 @@ import net.zaminmc.zea.chat.model.ChannelChat;
 import net.zaminmc.zea.chat.model.ClassifiedMessage;
 import net.zaminmc.zea.chat.model.DiscordMessage;
 import net.zaminmc.zea.chat.model.MessageCategory;
+import net.zaminmc.zea.chat.model.TaggedChannelChat;
 
 import java.util.Locale;
 import java.util.Optional;
@@ -21,8 +22,9 @@ import java.util.Set;
  * <p>Attribution per payload:
  *
  * <ul>
- *   <li>{@link ChannelChat} — speaker and content are parsed; the
- *       speaker's own echo of their message never pings.</li>
+ *   <li>{@link ChannelChat} and {@link TaggedChannelChat} — speaker and
+ *       content are parsed; the speaker's own echo of their message never
+ *       pings.</li>
  *   <li>{@link DiscordMessage} and unclassified messages — structure is
  *       not yet verified against observed samples, so the conservative
  *       EarthMC shape {@code Name: content} is required: the word before
@@ -61,6 +63,9 @@ public final class MentionDetector {
                 }
 
                 if (message.payload() instanceof ChannelChat chat) {
+                        return forChat(message, chat.displayName(), chat.content(), localName);
+                }
+                if (message.payload() instanceof TaggedChannelChat chat) {
                         return forChat(message, chat.displayName(), chat.content(), localName);
                 }
                 return forUnstructured(message, message.captured().text(), localName);

@@ -10,6 +10,7 @@ package net.zaminmc.zea.chat.model;
 public sealed interface MessagePayload permits
 		MessagePayload.None,
 		ChannelChat,
+		TaggedChannelChat,
 		PrivateMessage,
 		DiscordMessage,
 		VoteMessage,

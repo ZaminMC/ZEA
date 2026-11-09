@@ -27,17 +27,18 @@ config classes are added as features begin to need options (Stage 3+).
 
 **Deliverable:** stable, testable foundation.
 
-## Stage 2 — Message model and classification ✅ (parsers pending fixtures)
+## Stage 2 — Message model and classification ✅
 
 Capture incoming messages preserving original components; immutable
 normalized representation; EarthMC-specific classification; structured
 parsing (badges, nation/town, nicknames, events, PMs, system); unknown
 fallback; regression fixtures for every known family.
 
-Done: all of the above for every family with observed samples (14 fixture
-families, 83 tests passing). Pending: local/trade/nation/town parsers and
-component-level fixtures — blocked on in-game captured samples, tracked in
-docs/CHAT_CLASSIFICATION.md.
+Done: all of the above for every family with observed samples, including
+the local/trade/nation/town channel tags (parsed from the observed legacy
+samples; nation chat carries the sender's town). 18 fixture families.
+Pending: component-level fixtures — blocked on in-game captured samples,
+tracked in docs/CHAT_CLASSIFICATION.md.
 
 **Deliverable:** reliable EarthMC message classification.
 

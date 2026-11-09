@@ -1043,3 +1043,59 @@ Five commits, each landing with its tests:
   API does not expose) and the inventory edit-screen test gap remain.
 - Phase 1 stages are now all implemented to the unit-tested level; the
   remaining Phase 1 work is in-game verification of the whole build.
+
+## 2026-11-09 (session 10) — Local, trade, nation and town classifiers
+
+### Work done
+
+One commit, closing the last Stage 2 parser gap:
+
+- `TaggedChannelChat` — payload for player chat on the tagged channels:
+  bracket label, the sender's town (nation chat only — observed
+  `[Nation Chat|Sosnovka]`, where the nation is implicit because only
+  nation members can write there), display name, content.
+- `TaggedChannelChatClassifier` — exact bracket label opening the
+  message: `Local`, `Trade`, `Town Chat`, and `Nation Chat|<town>`
+  (town required, non-blank, bounded). Case-sensitive; declined shapes:
+  non-leading brackets, missing space, missing `": "`, bracketed names,
+  the unobserved town-less nation form. Runs before the global
+  classifier, which would otherwise read the bracket as an affiliation —
+  the exact misroute risk this session's doc previously tracked.
+- `MentionDetector` — structured attribution for the new payload, same
+  path as global chat; the unstructured fallback stays for messages the
+  classifiers do not recognize.
+- Fixtures: local, trade, nation, town entries; docs updated
+  (EARTHMC_MESSAGE_FORMATS.md records the observed legacy codes,
+  CHAT_CLASSIFICATION.md the parse and the residual ambiguity).
+
+### Research performed and findings
+
+- The observed samples for all four channels were in the project brief
+  all along (legacy-coded in-game logs) — the "no observed samples"
+  blocker was a bookkeeping gap, not a data gap. The nation-chat bracket
+  carries the sender's town, not the nation; trade's label is `Trade`
+  (not "Trade Chat", which the brief's prose typo suggested) and town's
+  is `Town Chat`, per the legacy strings.
+- Residual ambiguity accepted and documented: a nation or town actually
+  named "Local"/"Trade"/"Town Chat" would be claimed by the tag
+  classifier before global. EarthMC names are geographic; the tags are
+  data in ZEA-REPO so a wrong tag is correctable without a mod release.
+
+### Tests performed
+
+- `./gradlew build` green; 468 tests, 0 failures (was 443). New: 15
+  classifier tests (observed shapes, town handling, declines, pipeline
+  ordering), 8 fixture assertions (4 families × category + original
+  retention), 2 mention tests (structured attribution, self-echo).
+- In-game testing: none available in this environment. Text-anchored
+  parsing only; component-level structure remains unverified pending
+  in-game capture.
+
+### Outstanding problems
+
+- Component-level fixtures for every family (unchanged).
+- Nation chat without a town is unobserved; if it exists it currently
+  falls through to the global classifier's single-segment handling.
+- Stage 4 leftovers (nickname username display) and the inventory
+  edit-screen test gap remain. Live HelpChat verification still blocked
+  (paste.helpcha.at does not resolve from this environment).

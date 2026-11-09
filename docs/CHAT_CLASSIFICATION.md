@@ -27,10 +27,10 @@ Overlay (action bar) messages are skipped: they are not chat.
 - `MessageCategory` — GLOBAL, LOCAL, TRADE, NATION, TOWN, PRIVATE_MESSAGE,
   DISCORD, VOTE, CRATE_WIN, DEATH, SYSTEM, UNCLASSIFIED.
 - `MessagePayload` — sealed interface; one record per structured family
-  (`ChannelChat`, `PrivateMessage`, `VoteMessage`, `CrateWinMessage`,
-  `DeathMessage`, `SystemMessage`, `WritingChannelReport`,
-  `DiscordMessage`) plus `None`. Sealed so consumers (feeds,
-  notifications, history) pattern-match exhaustively.
+  (`ChannelChat`, `TaggedChannelChat`, `PrivateMessage`, `VoteMessage`,
+  `CrateWinMessage`, `DeathMessage`, `SystemMessage`,
+  `WritingChannelReport`, `DiscordMessage`) plus `None`. Sealed so
+  consumers (feeds, notifications, history) pattern-match exhaustively.
 - `ClassifiedMessage` — capture + category + payload.
 
 ## Confidence policy
@@ -57,7 +57,10 @@ Specific before generic; the first match wins:
 6. `DiscordClassifier` — `[Discord]` prefix; must run before global so a
    Discord header is never read as an affiliation bracket.
 7. `SystemClassifier` — `EarthMC » ` prefix.
-8. `GlobalChatClassifier` — weakest anchor (bracket + name + colon), so
+8. `TaggedChannelChatClassifier` — local/trade/nation/town; exact bracket
+   label at the start of the message, so it must run before global (which
+   would otherwise read the bracket as an affiliation).
+9. `GlobalChatClassifier` — weakest anchor (bracket + name + colon), so
    last.
 
 ## Global chat parsing
@@ -80,6 +83,27 @@ name → `: ` → content), with component enrichment for badges:
 - Bracket-less messages are **declined**: `Name: content` alone is too
   weak an anchor, so such messages stay unclassified rather than
   misclassified.
+
+## Tagged channel parsing (local / trade / nation / town)
+
+Text-level anchored parsing, mirroring the global rules:
+
+- **Tag**: the bracket must open the message (`[Local]`, `[Trade]`,
+  `[Town Chat]` are exact matches; nation chat continues with
+  `|Town`, where the town is the sender's). The nation form without a
+  town is unobserved and declined.
+- **Name and content**: one space, then the display name up to the first
+  `": "`, then the content — same rules as global (no brackets in the
+  name, first separator wins).
+- No badges have been observed on these channels, so none are parsed;
+  the original component is retained regardless.
+
+Residual ambiguity, accepted and documented: a nation or town actually
+named "Local", "Trade" or "Town Chat" would be claimed by the tag
+classifier before global could see it. EarthMC names are geographic and
+none collide with these labels in practice; the tags are mirrored from
+ZEA-REPO `datasets/channels.json` so a wrong tag is corrected in data,
+not code, once the repository client exists.
 
 ## Known badges
 
@@ -106,18 +130,13 @@ EARTHMC_MESSAGE_FORMATS.md.
 
 ## Open items (unresolved, never assumed)
 
-- **Local / Trade / Nation / Town message formats are not yet known.** No
-  observed samples exist, so no classifiers were written for them;
-  messages of those kinds currently land in UNCLASSIFIED. Fixtures from
-  in-game capture are the prerequisite. Risk to note: if these channels
-  use bracket-leading markers like `[Town] Name: message`, the global
-  classifier would currently claim them (a bracket parses as an
-  affiliation). The ZEA-REPO channels dataset is the planned data-driven
-  mechanism to carry per-channel message patterns so this can be
-  corrected without a mod release.
+- **Nation chat without a town** is unobserved; it is declined by the
+  tag classifier and would currently be claimed by the global
+  classifier's single-segment affiliation handling. An observed fixture
+  will settle the real shape.
 - **Component tree structure of EarthMC messages is unverified** (we have
-  rendered text, not the wire components). The parser is component-first
-  where structure exists and text-anchored otherwise; in-game captured
-  component fixtures will refine this.
+  rendered text and legacy codes, not the wire components). The parser is
+  component-first where structure exists and text-anchored otherwise;
+  in-game captured component fixtures will refine this.
 - Nickname → real username resolution (Stage 4, needs API + component
   investigation).

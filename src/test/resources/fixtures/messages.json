@@ -10,6 +10,26 @@
     "category": "GLOBAL"
   },
   {
+    "family": "local",
+    "text": "[Local] Abasing: yo",
+    "category": "LOCAL"
+  },
+  {
+    "family": "trade",
+    "text": "[Trade] Abasing: Everyone Say Cookie, and see what happens",
+    "category": "TRADE"
+  },
+  {
+    "family": "nation",
+    "text": "[Nation Chat|Sosnovka] Abasing: yo",
+    "category": "NATION"
+  },
+  {
+    "family": "town",
+    "text": "[Town Chat] Abasing: YOOO!",
+    "category": "TOWN"
+  },
+  {
     "family": "pm-incoming",
     "text": "[FORDaLoZ → me] hi",
     "category": "PRIVATE_MESSAGE"

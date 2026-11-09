@@ -12,12 +12,12 @@ import java.util.List;
  * classification failure never hides a message.
  *
  * <p>Order (specific before generic): writing-channel report, private
- * message, death, vote, crate win, Discord, system, global. Discord runs
- * before global so a {@code [Discord]} header is never read as an
- * affiliation bracket; the writing-channel report runs first because it
- * feeds server channel state. Classifiers for the local, trade, nation
- * and town channel formats are pending observed fixtures (see
- * docs/CHAT_CLASSIFICATION.md).
+ * message, death, vote, crate win, Discord, system, tagged channel
+ * (local/trade/nation/town), global. Discord and the tagged channels run
+ * before global so their bracketed headers are never read as affiliation
+ * brackets; the writing-channel report runs first because it feeds server
+ * channel state. Global is last: its bracket + name + colon anchor is the
+ * weakest of the chat shapes.
  */
 public final class ClassificationPipeline {
 	private final List<MessageClassifier> classifiers;
@@ -31,6 +31,7 @@ public final class ClassificationPipeline {
 				new CrateWinClassifier(),
 				new DiscordClassifier(),
 				new SystemClassifier(),
+				new TaggedChannelChatClassifier(),
 				new GlobalChatClassifier()));
 	}
 

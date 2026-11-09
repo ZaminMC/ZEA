@@ -57,6 +57,34 @@ Displayed name may differ from the account name (observed: displayed
 an authoritative source identifies it (EarthMC API by name/UUID); never
 invent a username; keep the nickname and its cosmetics available.
 
+## Local / Trade / Nation / Town
+
+Observed samples (legacy codes from in-game logs):
+
+```
+§8[§rLocal§r§8] §r§7Abasing§r§7: §ryo§r
+§8[§r§bTrade§r§8] §r§7Abasing§r§7: §r§fEveryone Say Cookie, and see what happens§r
+§8[§r§eNation Chat§r§8|§rSosnovka§r§8]§r §r§7Abasing§r§7: §r§eyo§r
+§8[§r§bTown Chat§r§8] §r§7Abasing§r§7: §r§bYOOO!§r
+```
+
+Flattened: `[Local] Name: content`, `[Trade] Name: content`,
+`[Nation Chat|Town] Name: content`, `[Town Chat] Name: content`. The
+bracket label opens the message and matches exactly (case included). In
+nation chat the bracket carries the sender's **town** (observed:
+`Sosnovka`) — the nation is implicit, since only nation members can write
+there. No badges have been observed on these channels; the name is plain
+and gray. The nation form without a town is unobserved and declined
+rather than guessed.
+
+Classification note: these are claimed before the global classifier, so a
+global affiliation can never shadow them. The inverse — a nation or town
+actually named "Local", "Trade" or "Town Chat" — would be claimed by the
+tag classifier first; EarthMC names are geographic and none collide with
+these labels in practice, and the tags are data in ZEA-REPO
+(`datasets/channels.json`) so a wrong tag can be corrected without a mod
+release.
+
 ## Vote messages
 
 ```
@@ -149,12 +177,13 @@ The following have **no observed samples yet** and therefore no classifiers
 (they currently land in Unclassified). Add fixtures here as they are
 captured in-game:
 
-- Local channel messages.
-- Trade channel messages.
-- Nation channel messages.
-- Town channel messages.
+- Nation chat without a town in the bracket (unobserved; currently
+  declined by the tag classifier — such messages would fall through to
+  the global classifier's single-segment affiliation handling).
 - The exact component tree (sibling/style structure) behind each observed
   text format — text-level fixtures exist; component-level structure needs
-  in-game capture.
+  in-game capture. The local/trade/nation/town legacy samples above came
+  from rendered logs, so their per-segment styling is known, but the wire
+  component layout is not.
 - Whether bracket-less global messages exist (nationless/townless
   senders).
