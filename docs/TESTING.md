@@ -44,7 +44,7 @@ Import: invalid URLs, invalid keys, oversized documents, unsupported schema
 versions, malformed configuration, secret exclusion, cancellation.
 Networked paths run against an **embedded mock HTTP server**
 (`com.sun.net.httpserver.HttpServer`); ordinary unit tests never touch
-`paste.helpcha.at`.
+`paste.helpch.at`.
 
 ## Minecraft integration verification
 

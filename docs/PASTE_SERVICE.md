@@ -1,23 +1,25 @@
 # HelpChat paste service — configuration sharing backend
 
 ZEA's configuration sharing uses HelpChat's paste service. This document
-records the protocol and ZEA's obligations. The hostname currently does not
-resolve from the development environment (NXDOMAIN, 2026-11-08), so live
-protocol verification is **pending**; the implementation is tested against
-an embedded mock HTTP server and a fake transport, and must be verified
-live before any claim of working integration.
+records the protocol and ZEA's obligations. **Verified live on
+2026-11-09**: upload, key response, byte-exact UTF-8 raw round-trip
+(including multibyte), presentation URL and `.java` extension form all
+behave as documented below. Note the hostname is `paste.helpch.at` —
+HelpChat's short domain; the `paste.helpcha.at` spelling that circulated
+in early notes does not resolve (NXDOMAIN from public resolvers and CI
+runners alike) and is not the service.
 
 ## Service
 
-- Base: `https://paste.helpcha.at`
-- Upload: `POST https://paste.helpcha.at/documents`
+- Base: `https://paste.helpch.at`
+- Upload: `POST https://paste.helpch.at/documents`
   - `Content-Type: text/plain; charset=utf-8`
   - Body: UTF-8 document bytes (the document itself, not a wrapped API call)
   - Response: JSON containing a `key`
-  - Resulting URL: `https://paste.helpcha.at/{key}`
-- Raw retrieval: `https://paste.helpcha.at/raw/{key}`
+  - Resulting URL: `https://paste.helpch.at/{key}`
+- Raw retrieval: `https://paste.helpch.at/raw/{key}`
   - The `.java`-style suffix seen in URLs like
-    `https://paste.helpcha.at/wozajojele.java` is presentation-only syntax
+    `https://paste.helpch.at/wozajojele.java` is presentation-only syntax
     highlighting; it is not required and does not imply content type. The
     document format ZEA uses is JSON regardless.
 
@@ -49,7 +51,7 @@ shareable. Only share-scoped configuration fields are serialized.
 
 1. Network operations never run on the render/client thread; bounded
    executor, explicit connect/read timeouts, response bodies always closed.
-2. Imports are restricted to HTTPS on exactly `paste.helpcha.at`; redirects
+2. Imports are restricted to HTTPS on exactly `paste.helpch.at`; redirects
    to other hosts and other schemes are rejected. Paste keys are validated
    before URL construction. Response size is capped.
 3. Uploads require an explicit user action; nothing uploads automatically.

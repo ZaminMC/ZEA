@@ -141,7 +141,7 @@ Versioned JSON share schemas, export, paste upload, import with validation
 and preview, safe application, mock-server tests.
 
 Done: `zea-share` envelope with strict format/type/version checks; paste
-key parsing pinned to `https://paste.helpcha.at` (bare keys, presentation
+key parsing pinned to `https://paste.helpch.at` (bare keys, presentation
 and raw URLs, extension stripping, traversal rejection); `PasteService`
 on a bounded executor (never follows redirects, 1 MB download cap,
 player-readable failures); payload codecs — buttons import strictly

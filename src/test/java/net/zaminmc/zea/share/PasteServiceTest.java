@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests the paste client against a local mock server — no test ever
- * touches paste.helpcha.at. The mock is intentionally dumb: handlers
+ * touches paste.helpch.at. The mock is intentionally dumb: handlers
  * are installed per test through a mutable dispatcher.
  */
 @Timeout(value = 30, unit = TimeUnit.SECONDS)

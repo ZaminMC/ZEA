@@ -215,7 +215,7 @@ Three independent networked subsystems, none of which know about each other:
 |---|---|---|
 | EarthMC API client (`earthmc`) | v4 REST + SSE | Public endpoints; `/api key` based auth for private data; keys stored locally, never shared; 180 req/min budget enforced client-side |
 | ZEA-REPO client (`earthmc`) | Manifest-driven data download | Static GitHub raw files; no server backend |
-| HelpChat paste client (`share`) | Config sharing | `paste.helpcha.at`, exact-hostname allowlist, HTTPS only, size limits |
+| HelpChat paste client (`share`) | Config sharing | `paste.helpch.at`, exact-hostname allowlist, HTTPS only, size limits |
 
 Common rules: bounded executor, explicit timeouts, validated responses, no
 render-thread IO, graceful failure when the service is unavailable.

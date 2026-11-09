@@ -14,20 +14,20 @@ class PasteKeyTest {
 
 	@Test
 	void presentationUrlsParse() throws ShareException {
-		PasteKey key = PasteKey.parse("https://paste.helpcha.at/wozajojele.java");
+		PasteKey key = PasteKey.parse("https://paste.helpch.at/wozajojele.java");
 
 		assertEquals("wozajojele", key.key());
-		assertEquals("https://paste.helpcha.at/wozajojele", key.url());
+		assertEquals("https://paste.helpch.at/wozajojele", key.url());
 	}
 
 	@Test
 	void rawUrlsParse() throws ShareException {
-		assertEquals("wozajojele", PasteKey.parse("https://paste.helpcha.at/raw/wozajojele").key());
+		assertEquals("wozajojele", PasteKey.parse("https://paste.helpch.at/raw/wozajojele").key());
 	}
 
 	@Test
 	void jsonExtensionsAreStrippedLikeJavaOnes() throws ShareException {
-		assertEquals("abcdef", PasteKey.parse("https://paste.helpcha.at/abcdef.json").key());
+		assertEquals("abcdef", PasteKey.parse("https://paste.helpch.at/abcdef.json").key());
 		assertEquals("abcdef", PasteKey.parse("abcdef.json").key());
 	}
 
@@ -38,7 +38,7 @@ class PasteKeyTest {
 
 	@Test
 	void hostIsCaseInsensitive() throws ShareException {
-		assertEquals("wozajojele", PasteKey.parse("https://PASTE.HELPCHA.AT/wozajojele").key());
+		assertEquals("wozajojele", PasteKey.parse("https://PASTE.HELPCH.AT/wozajojele").key());
 	}
 
 	@Test
@@ -46,40 +46,40 @@ class PasteKeyTest {
 		ShareException e = assertThrows(ShareException.class, () ->
 				PasteKey.parse("https://evil.example/wozajojele"));
 
-		assertTrue(e.getMessage().contains("paste.helpcha.at"), e.getMessage());
+		assertTrue(e.getMessage().contains("paste.helpch.at"), e.getMessage());
 	}
 
 	@Test
 	void httpIsRejected() {
 		assertThrows(ShareException.class, () ->
-				PasteKey.parse("http://paste.helpcha.at/wozajojele"));
+				PasteKey.parse("http://paste.helpch.at/wozajojele"));
 	}
 
 	@Test
 	void schemelessUrlLikeInputIsRejected() {
 		assertThrows(ShareException.class, () ->
-				PasteKey.parse("paste.helpcha.at/wozajojele"));
+				PasteKey.parse("paste.helpch.at/wozajojele"));
 	}
 
 	@Test
 	void lookalikeHostsAreRejected() {
 		assertThrows(ShareException.class, () ->
-				PasteKey.parse("https://paste.helpcha.at.evil.example/wozajojele"));
+				PasteKey.parse("https://paste.helpch.at.evil.example/wozajojele"));
 	}
 
 	@Test
 	void queriesAndFragmentsAreRejected() {
 		assertThrows(ShareException.class, () ->
-				PasteKey.parse("https://paste.helpcha.at/wozajojele?x=1"));
+				PasteKey.parse("https://paste.helpch.at/wozajojele?x=1"));
 		assertThrows(ShareException.class, () ->
-				PasteKey.parse("https://paste.helpcha.at/wozajojele#top"));
+				PasteKey.parse("https://paste.helpch.at/wozajojele#top"));
 	}
 
 	@Test
 	void traversalShapedKeysAreRejected() {
 		assertThrows(ShareException.class, () -> PasteKey.parse("../etc/passwd"));
-		assertThrows(ShareException.class, () -> PasteKey.parse("https://paste.helpcha.at/../other"));
-		assertThrows(ShareException.class, () -> PasteKey.parse("https://paste.helpcha.at/raw/../secret"));
+		assertThrows(ShareException.class, () -> PasteKey.parse("https://paste.helpch.at/../other"));
+		assertThrows(ShareException.class, () -> PasteKey.parse("https://paste.helpch.at/raw/../secret"));
 		assertThrows(ShareException.class, () -> PasteKey.parse("a/b"));
 		assertThrows(ShareException.class, () -> PasteKey.parse("a%2Fb"));
 	}
@@ -112,9 +112,9 @@ class PasteKeyTest {
 	@Test
 	void deepPathsAreRejected() {
 		assertThrows(ShareException.class, () ->
-				PasteKey.parse("https://paste.helpcha.at/a/b/c"));
+				PasteKey.parse("https://paste.helpch.at/a/b/c"));
 		assertThrows(ShareException.class, () ->
-				PasteKey.parse("https://paste.helpcha.at/raw/a/b"));
+				PasteKey.parse("https://paste.helpch.at/raw/a/b"));
 	}
 
 	@Test

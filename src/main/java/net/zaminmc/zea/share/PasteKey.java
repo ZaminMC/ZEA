@@ -6,8 +6,8 @@ import java.util.Locale;
 /**
  * A HelpChat paste key, parsed from whatever the player pasted: a bare
  * key ({@code wozajojele}), a presentation URL
- * ({@code https://paste.helpcha.at/wozajojele.java}) or a raw URL
- * ({@code https://paste.helpcha.at/raw/wozajojele}).
+ * ({@code https://paste.helpch.at/wozajojele.java}) or a raw URL
+ * ({@code https://paste.helpch.at/raw/wozajojele}).
  *
  * <p>Accepting exactly one HTTPS host and a whitelist key charset is the
  * import path's URL gate: other hosts, other schemes, queries,
@@ -20,7 +20,7 @@ import java.util.Locale;
  */
 public record PasteKey(String key) {
 	/** The only host imports may come from. */
-	public static final String HOST = "paste.helpcha.at";
+	public static final String HOST = "paste.helpch.at";
 
 	/** The production service root; HTTPS is the only allowed scheme. */
 	public static final String BASE_URL = "https://" + HOST;

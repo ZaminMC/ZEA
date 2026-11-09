@@ -190,7 +190,7 @@ class ShareCoordinatorTest {
 
 		ShareException e = awaitFailure(coordinator.beginImport("https://evil.example/x"));
 
-		assertTrue(e.getMessage().contains("paste.helpcha.at"), e.getMessage());
+		assertTrue(e.getMessage().contains("paste.helpch.at"), e.getMessage());
 		assertFalse(coordinator.hasPendingImport());
 	}
 
