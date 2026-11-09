@@ -1048,7 +1048,7 @@ Five commits, each landing with its tests:
 
 ### Work done
 
-Two commits:
+Three commits:
 
 **Add local, trade, nation and town chat classifiers** — closing the last
 Stage 2 parser gap:
@@ -1085,6 +1085,12 @@ test gap from session 6:
   its translation-key suffix explicitly (`Rejection.key()`), so the
   lang keys and the enum cannot drift apart silently.
 
+**Reindent remaining files to tabs** — finishing the migration the
+earlier `Reindent ZeaClient to tabs` commit started. 63 files, no
+content changes: the conversion is text-block-aware (leading whitespace
+inside a text block is string data and was left byte-identical — the
+share-document tests that compare exact JSON confirm it).
+
 ### Research performed and findings
 
 - The observed samples for all four channels were in the project brief
@@ -1101,8 +1107,10 @@ test gap from session 6:
 ### Tests performed
 
 - `./gradlew build` green after each commit; 478 tests, 0 failures
-  (was 443). New: 15 classifier tests (observed shapes, town handling,
-  declines, pipeline ordering), 8 fixture assertions (4 families ×
+  (was 443) — the count unchanged through the reindent, which is the
+  verification that no string content moved. New: 15 classifier tests
+  (observed shapes, town handling, declines, pipeline ordering), 8
+  fixture assertions (4 families ×
   category + original retention), 2 mention tests (structured
   attribution, self-echo), 10 edit-form tests (validation order,
   refusal reasons, untouched working copy after refusal, slash
