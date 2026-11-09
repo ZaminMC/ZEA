@@ -1,6 +1,7 @@
 package net.zaminmc.zea.mixin;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.input.KeyEvent;
@@ -65,7 +66,7 @@ public abstract class ChatScreenMixin {
 				minecraft.font,
 				2,
 				screen.height - INPUT_STRIP_HEIGHT - ChatTabBar.TAB_HEIGHT,
-				screen.width - 4,
+				zea$stripMaxWidth(minecraft, screen),
 				Feeds.visibleTabs(ZeaClient.config().enabledExtraFeedIds()),
 				chat.feedSelection(),
 				feed -> MultiSendInteraction.isTargeted(
@@ -219,6 +220,18 @@ public abstract class ChatScreenMixin {
 			MultiSendToast.showAccepted(minecraft, targets.targets().size(), destinations);
 		}
 		ci.cancel();
+	}
+
+	/**
+	 * The widest the tab strip may be: the chat panel's on-screen width.
+	 * In 26.3 that is {@code ChatComponent.getWidth(option)} — floor(option
+	 * * 280 + 40) screen pixels, independent of chat scale (the renderer
+	 * scales internally by 1/scale; verified against the bytecode). The
+	 * screen bound stays for tiny windows.
+	 */
+	private static int zea$stripMaxWidth(Minecraft minecraft, ChatScreen screen) {
+		int panelWidth = ChatComponent.getWidth(minecraft.options.chatWidth().get());
+		return Math.min(screen.width - 4, panelWidth);
 	}
 
 	private void zea$openSearch(ChatScreen screen, FeedFilter filter, Minecraft minecraft) {
