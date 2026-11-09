@@ -51,7 +51,7 @@ public final class ChatSubsystem {
 	private final ChannelState channelState = new ChannelState();
 	private final FeedSelection feedSelection = new FeedSelection(Feeds.ALL);
 	private final SendTargets sendTargets = new SendTargets();
-	private final FeedFilter feedFilter = new FeedFilter(classifications(), feedSelection);
+	private final FeedFilter feedFilter;
 	private final MultiChannelDispatcher dispatcher;
 	private final Notifications notifications;
 	private final Mentions mentions;
@@ -66,6 +66,12 @@ public final class ChatSubsystem {
 		this.classifications = new ClassificationCache(classification, 512);
 		this.config = config;
 		this.capture = capture;
+		// Constructed here — after the cache exists — never in a
+		// field initializer: initializers run before this body and
+		// would read the still-null field through classifications()
+		// (the dev.23 live crash; ChatSubsystemWiringTest pins the
+		// compiled order).
+		this.feedFilter = new FeedFilter(this.classifications, this.feedSelection);
 		this.dispatcher = new MultiChannelDispatcher(
 				this::sendCommand,
 				new DispatchFeedback(),
