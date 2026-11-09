@@ -17,7 +17,6 @@ class PasteKeyTest {
                 PasteKey key = PasteKey.parse("https://paste.helpcha.at/wozajojele.java");
 
                 assertEquals("wozajojele", key.key());
-                assertEquals("https://paste.helpcha.at/raw/wozajojele", key.rawUri().toString());
                 assertEquals("https://paste.helpcha.at/wozajojele", key.url());
         }
 

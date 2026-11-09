@@ -36,11 +36,6 @@ public record PasteKey(String key) {
                 }
         }
 
-        /** The raw-document URL this key downloads from. */
-        public URI rawUri() {
-                return URI.create(BASE_URL + "/raw/" + key);
-        }
-
         /** The presentation URL shown to players. */
         public String url() {
                 return BASE_URL + "/" + key;
