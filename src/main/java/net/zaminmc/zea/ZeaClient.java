@@ -136,27 +136,6 @@ public final class ZeaClient implements ClientModInitializer {
 		}
 	}
 
-	/**
-	 * Flush pending history, then drain the executor: submitted work
-	 * finishes before shutdown, and the bounded wait never hangs the
-	 * game on a stuck disk.
-	 */
-	private static void shutdownHistory() {
-		try {
-			chat.shutdownHistory();
-		} finally {
-			historyExecutor.shutdown();
-			try {
-				if (!historyExecutor.awaitTermination(HISTORY_SHUTDOWN_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-					LOGGER.warn("History writes did not finish within {} ms; continuing shutdown",
-									HISTORY_SHUTDOWN_TIMEOUT_MILLIS);
-				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
-		}
-	}
-
 	/** Sends a button's command through the play connection. */
 	private static ButtonActivator.CommandSender zea$commandSender() {
 		return command -> {
