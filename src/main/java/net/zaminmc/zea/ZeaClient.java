@@ -1,14 +1,22 @@
 package net.zaminmc.zea;
 
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.network.chat.Component;
 import net.zaminmc.zea.buttons.ButtonActivator;
 import net.zaminmc.zea.buttons.InventoryButtons;
 import net.zaminmc.zea.chat.ChatSubsystem;
+import net.zaminmc.zea.chat.capture.CaptureCommands;
+import net.zaminmc.zea.chat.capture.CaptureRecorder;
+import net.zaminmc.zea.chat.capture.ComponentJson;
 import net.zaminmc.zea.chat.classify.ClassificationPipeline;
 import net.zaminmc.zea.config.ZeaConfig;
 import net.zaminmc.zea.config.ZeaConfigStore;
@@ -45,7 +53,9 @@ public final class ZeaClient implements ClientModInitializer {
 	private static ZeaConfig config;
 	private static ExecutorService historyExecutor;
 	private static ExecutorService shareExecutor;
+	private static ExecutorService captureExecutor;
 	private static PasteService pasteService;
+	private static CaptureRecorder captureRecorder;
 
 	public static ClientLifecycle lifecycle() {
 		return lifecycle;
@@ -70,10 +80,20 @@ public final class ZeaClient implements ClientModInitializer {
 		config = new ZeaConfigStore(configDir.resolve("zea.json")).load();
 		historyExecutor = newHistoryExecutor();
 		lifecycle = new ClientLifecycle();
+		captureExecutor = newIoExecutor("ZEA-Capture");
+		captureRecorder = new CaptureRecorder(
+					configDir.resolve("zea/capture"),
+					ComponentJson::serialize,
+					captureExecutor,
+					Minecraft.getInstance()::execute,
+					stopped -> Minecraft.getInstance().gui.hud.getChat().addClientSystemMessage(
+								Component.literal("Capture finished on its own — " + stopped.recorded()
+												+ " messages saved to " + stopped.file() + ".")));
 		chat = new ChatSubsystem(
 						lifecycle,
 						new ClassificationPipeline(),
 						config,
+						captureRecorder,
 						configDir.resolve("zea/history"),
 						historyExecutor);
 		inventoryButtons = new InventoryButtons(
@@ -82,8 +102,12 @@ public final class ZeaClient implements ClientModInitializer {
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> inventoryButtons.reset());
 		shareExecutor = newShareExecutor();
 		pasteService = new PasteService(URI.create(PasteKey.BASE_URL), shareExecutor);
-		ShareCommands.register(new ShareCoordinator(
-					pasteService, inventoryButtons, config, Minecraft.getInstance()::execute));
+		ShareCoordinator coordinator = new ShareCoordinator(
+					pasteService, inventoryButtons, config, Minecraft.getInstance()::execute);
+		LiteralArgumentBuilder<FabricClientCommandSource> zea = ClientCommands.literal("zea");
+		ShareCommands.register(zea, coordinator);
+		CaptureCommands.register(zea, captureRecorder, lifecycle::onEarthMc);
+		ClientCommandRegistrationCallback.EVENT.register((dispatcher, buildContext) -> dispatcher.register(zea));
 		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> shutdownBackgroundWork());
 		ZeaKeys.register();
 	}
@@ -114,25 +138,33 @@ public final class ZeaClient implements ClientModInitializer {
 	}
 
 	/**
-	 * Flush pending history, close the paste client, then drain the
-	 * executors: submitted work finishes before shutdown, and the bounded
-	 * wait never hangs the game on a stuck disk or a stuck request.
+	 * Flush pending history, close the paste client, finish any capture,
+	 * then drain the executors: submitted work finishes before shutdown,
+	 * and the bounded wait never hangs the game on a stuck disk or a
+	 * stuck request.
 	 */
 	private static void shutdownBackgroundWork() {
 		try {
 			chat.shutdownHistory();
 		} finally {
 			pasteService.close();
-			historyExecutor.shutdown();
-			try {
-				if (!historyExecutor.awaitTermination(HISTORY_SHUTDOWN_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
-					LOGGER.warn("History writes did not finish within {} ms; continuing shutdown",
-								HISTORY_SHUTDOWN_TIMEOUT_MILLIS);
-				}
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-			}
+			captureRecorder.shutdown();
+			drain(historyExecutor);
+			drain(captureExecutor);
 			shareExecutor.shutdown();
+		}
+	}
+
+	/** Shuts down an IO executor and waits for its last write to land. */
+	private static void drain(ExecutorService executor) {
+		executor.shutdown();
+		try {
+			if (!executor.awaitTermination(HISTORY_SHUTDOWN_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+				LOGGER.warn("Background writes did not finish within {} ms; continuing shutdown",
+							HISTORY_SHUTDOWN_TIMEOUT_MILLIS);
+			}
+		} catch (InterruptedException e) {
+			Thread.currentThread().interrupt();
 		}
 	}
 

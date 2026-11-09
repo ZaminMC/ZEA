@@ -105,6 +105,28 @@ none collide with these labels in practice; the tags are mirrored from
 ZEA-REPO `datasets/channels.json` so a wrong tag is corrected in data,
 not code, once the repository client exists.
 
+## Capturing component samples
+
+Component-level ground truth — the wire components with their hover and
+click events, sibling structure and per-segment styles — cannot be
+reconstructed from logs. `/zea capture` records it:
+
+1. Join EarthMC and run `/zea capture on`. Messages are recorded to
+   `config/zea/capture/capture-<timestamp>.json` — plain text, legacy
+   codes, the classification, and the component as vanilla JSON.
+2. Reproduce the messages worth capturing (a badge with hover text, a
+   nickname, nation chat without a town, a death message).
+3. Run `/zea capture off`. A session stops on its own after 100
+   messages, and disconnects only flush it — the session survives a
+   rejoin.
+
+Capture files are `zea-capture` documents; `CaptureFixtures` (test
+sources) loads them back into live components, so a file captured
+in-game drops straight into a regression test. Entries whose component
+cannot serialize (item hovers need registries) keep their text and the
+error instead. Capture is a local diagnostic: off unless started, never
+uploaded, never part of share documents.
+
 ## Known badges
 
 `KnownBadges` mirrors the ZEA-REPO `datasets/badges.json` ids exactly
@@ -137,6 +159,7 @@ EARTHMC_MESSAGE_FORMATS.md.
 - **Component tree structure of EarthMC messages is unverified** (we have
   rendered text and legacy codes, not the wire components). The parser is
   component-first where structure exists and text-anchored otherwise;
-  in-game captured component fixtures will refine this.
+  `/zea capture` now provides the recording tool, and captured files
+  will refine this once a session on EarthMC produces them.
 - Nickname → real username resolution (Stage 4, needs API + component
   investigation).

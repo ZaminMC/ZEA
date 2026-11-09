@@ -53,3 +53,8 @@ hover/click events, chat dimensions, inventory rendering, screen transitions,
 multiplayer disconnects) is verified manually in-game on the target version.
 Results are recorded in WORKLOG.md per release. Compilation and unit tests
 are never claimed as in-game verification.
+
+Component-level fixtures come out of that round through `/zea capture`
+(see CHAT_CLASSIFICATION.md): captured files load through the test-side
+`CaptureFixtures`, which the bootstrap helper (`VanillaBootstrap`) makes
+possible in a bare test JVM.

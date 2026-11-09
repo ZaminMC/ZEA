@@ -5,6 +5,7 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.zaminmc.zea.ZeaClient;
+import net.zaminmc.zea.chat.capture.CaptureRecorder;
 import net.zaminmc.zea.chat.capture.MessageCapture;
 import net.zaminmc.zea.chat.classify.ClassificationCache;
 import net.zaminmc.zea.chat.classify.ClassificationPipeline;
@@ -55,12 +56,14 @@ public final class ChatSubsystem {
 	private final MentionAutoResponder autoResponder;
 	private final ChatHistory history;
 	private final HistoryRecorder historyRecorder;
+	private final CaptureRecorder capture;
 
 	public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification, ZeaConfig config,
-			Path historyDirectory, Executor historyExecutor) {
+			CaptureRecorder capture, Path historyDirectory, Executor historyExecutor) {
 		this.classification = classification;
 		this.classifications = new ClassificationCache(classification, 512);
 		this.config = config;
+		this.capture = capture;
 		this.dispatcher = new MultiChannelDispatcher(
 				this::sendCommand,
 				new DispatchLogger(),

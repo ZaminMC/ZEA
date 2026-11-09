@@ -1,8 +1,8 @@
 package net.zaminmc.zea.share;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.network.chat.Component;
@@ -24,31 +24,34 @@ import java.util.concurrent.CompletionException;
  * matches the literal children ({@code confirm}, {@code cancel}) before
  * the greedy paste argument, so a paste key that spells "confirm" is
  * still reachable by pasting the full URL instead.
+ *
+ * <p>The {@code /zea} root itself is assembled once in the client
+ * entrypoint; this class contributes its branches.
  */
 public final class ShareCommands {
 	private ShareCommands() {
 	}
 
-	/** Registers the share commands; call once from the client entrypoint. */
-	public static void register(ShareCoordinator coordinator) {
-		ClientCommandRegistrationCallback.EVENT.register((dispatcher, buildContext) -> dispatcher.register(
-				ClientCommands.literal("zea")
-						.then(ClientCommands.literal("share")
-								.then(ClientCommands.argument("type",
+	/**
+	 * Adds the share and import branches to the {@code /zea} root.
+	 *
+	 * @param root       the {@code /zea} root builder, assembled by the entrypoint
+	 * @param coordinator the sharing coordinator
+	 */
+	public static void register(LiteralArgumentBuilder<FabricClientCommandSource> root,
+			ShareCoordinator coordinator) {
+		root.then(ClientCommands.literal("share")
+						.then(ClientCommands.argument("type",
 										StringArgumentType.word())
-										.executes(context -> share(
-												context, coordinator))))
-						.then(ClientCommands.literal("import")
-								.then(ClientCommands.argument("paste",
-										StringArgumentType.greedyString())
-										.executes(context -> beginImport(
-												context, coordinator)))
-								.then(ClientCommands.literal("confirm")
-										.executes(context -> confirmImport(
-												context, coordinator)))
-								.then(ClientCommands.literal("cancel")
-										.executes(context -> cancelImport(
-												context, coordinator))))));
+										.executes(context -> share(context, coordinator))))
+					.then(ClientCommands.literal("import")
+							.then(ClientCommands.argument("paste",
+											StringArgumentType.greedyString())
+											.executes(context -> beginImport(context, coordinator)))
+										.then(ClientCommands.literal("confirm")
+													.executes(context -> confirmImport(context, coordinator)))
+										.then(ClientCommands.literal("cancel")
+														.executes(context -> cancelImport(context, coordinator))));
 	}
 
 	private static int share(CommandContext<FabricClientCommandSource> context, ShareCoordinator coordinator) {
