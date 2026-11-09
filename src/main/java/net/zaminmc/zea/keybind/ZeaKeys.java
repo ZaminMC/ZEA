@@ -5,6 +5,8 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.resources.Identifier;
 
+import java.util.List;
+
 /**
  * ZEA's key bindings, registered into the vanilla controls screen.
  *
@@ -34,11 +36,26 @@ public final class ZeaKeys {
         public static final KeyMapping EDIT_BUTTONS = new KeyMapping(
                         "zea.key.edit_buttons", InputConstants.Type.KEYBOARD, InputConstants.UNKNOWN.getValue(), CATEGORY);
 
+        /**
+         * Every binding {@link #register()} delegates to — the single source
+         * of truth, so a mapping can never be defined and consumed but left
+         * out of registration (the edit-mode keybind once was, which left
+         * button editing unreachable).
+         */
+        private static final List<KeyMapping> ALL = List.of(SEARCH_CHAT, EDIT_BUTTONS);
+
         private ZeaKeys() {
         }
 
         /** Registers the bindings; called once from the client entrypoint. */
         public static void register() {
-                KeyMappingHelper.registerKeyMapping(SEARCH_CHAT);
+                for (KeyMapping mapping : ALL) {
+                        KeyMappingHelper.registerKeyMapping(mapping);
+                }
+        }
+
+        /** The bindings registration hands to Fabric; the test surface. */
+        public static List<KeyMapping> registered() {
+                return ALL;
         }
 }
