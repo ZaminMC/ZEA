@@ -1203,3 +1203,86 @@ capture" item was waiting for:
   question all become answerable from data.
 - Stage 4 leftovers (nickname username display) and live HelpChat
   verification remain blocked as before.
+
+## 2026-11-09 — dev.16 launch crash: duck interface inside the mixin package
+
+### What happened
+
+Live test report from the player: dev.16 crashes during startup, before
+the title screen. Log signature (three identical uploads, one session):
+
+```
+net.fabricmc.loader.impl.FormattedException:
+  java.lang.RuntimeException: Mixin transformation of
+  net.zaminmc.zea.mixin.ScreenWidgetAccess failed
+Caused by: org.spongepowered.asm.mixin.transformer.throwables.IllegalClassLoadError:
+  net.zaminmc.zea.mixin.ScreenWidgetAccess is in a defined mixin package
+  net.zaminmc.zea.mixin.* owned by zea.mixins.json and cannot be referenced directly
+```
+
+The first failure fires while populating the crash report itself
+(`YumiEvents.<clinit>` → classloading cascade), the fatal one at
+`Main.main:251` — every path resolves to the same missing class.
+
+### Root cause
+
+`ScreenWidgetAccess` — the duck interface `ScreenMixin` adds to `Screen`
+so screen-targeting mixins can call `addRenderableWidget` (built after
+the dev.5 crash) — lived in the mixin package. Mixin semantics, verified
+by disassembling `sponge-mixin-0.17.5+mixin.0.8.7` (Fabric's fork):
+
+- `MixinProcessor.applyMixins` owns every class under a config's
+  package. A classload of any of them either gets the accessor
+  carve-out or throws `IllegalClassLoadError`.
+- The carve-out lives in `MixinCoprocessorAccessor`: it passes through
+  **registered accessor mixins only** (`@Mixin` interfaces whose members
+  are all `@Accessor`/`@Invoker`, like `ChatComponentAccessor`).
+- `ScreenWidgetAccess` is a plain duck interface: unregistered, not
+  `@Mixin`. It is merged into the transformed `Screen`'s interface list,
+  and the JVM resolves a class's superinterfaces eagerly at define time.
+  So the first load of `Screen` — deep in startup — tried to load the
+  interface, Mixin refused, game over. Every build carrying it was
+  unlaunchable in production; nothing before dev.15 shipped it to a
+  real client.
+
+Why the dev environment never saw it: the dev classpath loads mod
+classes through a different code path, and the unit tests never define
+the transformed `Screen`.
+
+### Fix
+
+- `ScreenWidgetAccess` moved to the new `net.zaminmc.zea.duck` package,
+  outside Mixin's ownership. `ScreenMixin` (implements) and
+  `ChatScreenMixin` (two casts) now import it from there. The duck
+  interface's javadoc states the placement rule and points at the
+  hygiene test.
+- `MixinPackageHygieneTest` scans the compiled production classes with
+  ASM and turns both loadability rules into build failures:
+  1. every class under `net/zaminmc/zea/mixin/` must be registered in
+     `zea.mixins.json` (stray classes — including nested ones — are
+     unloadable in production);
+  2. any bytecode reference to a mixin-package class must target a
+     registered accessor mixin (interface, `@Mixin`, members all
+     `@Accessor`/`@Invoker`).
+  Detail that cost a debugging round: Mixin's annotations have CLASS
+  retention, so ASM reports them as *invisible* annotations
+  (`RetentionPolicy.CLASS`), not visible ones.
+
+### Tests performed
+
+- `./gradlew test` green; 490 tests, 0 failures (was 488). The two new
+  hygiene tests pass against the fixed tree; rule 2 was observed firing
+  (correctly flagging the shape) during development before the fix
+  landed.
+- Jar verification: `net/zaminmc/zea/duck/ScreenWidgetAccess.class`
+  present, `mixin/ScreenWidgetAccess` gone, `ScreenMixin.class`
+  references the new location.
+- In-game testing: none available in this environment. The fix is a
+  bytecode-level constraint, so the launch crash is structurally
+  impossible now; the player's next dev-build run confirms it.
+
+### Outstanding problems
+
+- The untracked multi-send interaction layer (`MultiSendInteraction`
+  policy class) remains to be wired into the tab bar and chat screen —
+  continuing next.
