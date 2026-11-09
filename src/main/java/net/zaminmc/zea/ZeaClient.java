@@ -18,6 +18,7 @@ import net.zaminmc.zea.chat.capture.CaptureCommands;
 import net.zaminmc.zea.chat.capture.CaptureRecorder;
 import net.zaminmc.zea.chat.capture.ComponentJson;
 import net.zaminmc.zea.chat.classify.ClassificationPipeline;
+import net.zaminmc.zea.config.ConfigScreen;
 import net.zaminmc.zea.config.ZeaConfig;
 import net.zaminmc.zea.config.ZeaConfigStore;
 import net.zaminmc.zea.keybind.ZeaKeys;
@@ -105,6 +106,11 @@ public final class ZeaClient implements ClientModInitializer {
 		ShareCoordinator coordinator = new ShareCoordinator(
 					pasteService, inventoryButtons, config, Minecraft.getInstance()::execute);
 		LiteralArgumentBuilder<FabricClientCommandSource> zea = ClientCommands.literal("zea");
+		// Bare /zea opens the settings menu.
+		zea.executes(context -> {
+			ConfigScreen.open(context.getSource().getClient(), config);
+			return 1;
+		});
 		ShareCommands.register(zea, coordinator);
 		CaptureCommands.register(zea, captureRecorder, lifecycle::onEarthMc);
 		ClientCommandRegistrationCallback.EVENT.register((dispatcher, buildContext) -> dispatcher.register(zea));

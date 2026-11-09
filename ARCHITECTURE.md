@@ -65,7 +65,7 @@ Packages represent responsibilities. The mapping:
 | `net.zaminmc.zea.buttons` | Inventory buttons |
 | `net.zaminmc.zea.share` | Paste client, share envelope, payload codecs, coordinator, `/zea` commands |
 | `net.zaminmc.zea.earthmc` | EarthMC API client, server identity, ZEA-REPO data |
-| `net.zaminmc.zea.config` | Configuration (MoulConfig) |
+| `net.zaminmc.zea.config` | Configuration (MoulConfig), the `/zea` settings screen |
 | `net.zaminmc.zea.persistence` | Atomic file IO, JSON store utilities |
 | `net.zaminmc.zea.util` | Small shared utilities only |
 
