@@ -1338,3 +1338,108 @@ that gap; it is the actual last code item of Stage 3's chat-surface plan.
 - In-game verification of the whole chat surface (tabs, search, copy,
   multi-send) still pending the player's next session — dev.17 carries
   the launch-crash fix, so a run is finally possible again.
+## 2026-11-09 — dev.18 launch crash: the mention-highlight wrap handler layout
+
+### What happened
+
+Live test report from the player: dev.18 crashes during startup, before
+the title screen — this time past the point where dev.16 died (`ZEA
+loading` appears; the duck-interface fix held). Log signature:
+
+```
+Mixin apply for mod zea failed zea.mixins.json:MentionHighlightMixin
+  -> net.minecraft.client.gui.components.ChatComponent:
+  InvalidInjectionException @WrapOperation operation wrapper method
+  ChatComponent::zea$tintMentionedLine has an invalid signature.
+  Found unexpected argument type int at index 0, expected
+  ChatComponent$ChatGraphicsAccess.
+```
+
+MixinExtras printed both descriptors: the built handler put the
+enclosing lambda's arguments first and `Operation` last; the expected
+layout is the opposite. `ChatComponentMixin`'s two wraps applied cleanly
+in the same log — both take only receiver + wrapped arguments, no
+enclosing capture — which isolated the failure to exactly that layout
+question.
+
+### Root cause
+
+Researched before touching anything, from three primary sources that
+all agree:
+
+1. **The MixinExtras wiki** — the handler receives the wrapped
+   operation's receiver, then its arguments, then the `Operation`, then
+   *optionally* a prefix of the enclosing method's arguments at the
+   end.
+2. **The shipped MixinExtras 0.5.5, decompiled**
+   (`WrapOperationInjector#invokeHandler`) — it pushes
+   `methodArgs[0..originalArgs.length]` (the receiver at index 0 for a
+   non-static target, per `getEffectiveArgTypes`), then the generated
+   `Operation`, then `target.arguments[0..captureTargetArgs]` as a
+   captured prefix. And `OperationUtils#generateSyntheticBridge` runs
+   `checkArgumentCount(args, argTypes.length, …)` — the receiver counts
+   as a call argument — before re-executing the original invocation.
+3. **The mapped 26.3 jar** — the line-background lambda compiles as
+   `private static void lambda$extractRenderState$1(int, int,
+   ChatGraphicsAccess, int, float, GuiMessage.Line, int, float)`, and
+   its `fill` call site passes `aload_2` (the lambda's
+   `ChatGraphicsAccess` parameter) as the receiver.
+
+So the old handler had two defects, one visible and one latent: the
+argument order was wrong (rejected at apply time), and
+`original.call(x0, y0, x1, y1, color)` omitted the receiver — which the
+generated bridge would have rejected at runtime with
+`IncorrectArgumentCountException` even if the apply had succeeded.
+
+Why no test caught it: MixinExtras validates handler signatures only
+when the mixin *applies* to a target class, and unit builds never apply
+mixins. The compiled-classes checks (`MixinSurfaceTest`,
+`MixinPackageHygieneTest`) verify targets and registration, not the
+handler contract.
+
+### Fix
+
+- `MentionHighlightMixin` — the handler now reads
+  `(graphics, x0, y0, x1, y1, color, Operation, chatBottom,
+  entryHeight, lineGraphics, maxWidth, backgroundOpacity, line,
+  lineIndex, alpha)` and calls `original.call(graphics, x0, y0, x1, y1,
+  color)`. The compiled descriptor was verified byte-for-byte against
+  the one MixinExtras printed in the crash log. Behavior is unchanged:
+  tint on top of vanilla's fill, keyed on the lambda's `GuiMessage.Line`
+  — the same instance the mention detector marked.
+- `WrapOperationSignatureTest` (new) — scans the compiled mixin classes
+  with ASM, finds every `@WrapOperation` handler, and judges each
+  against the mapped jar: the receiver + wrapped arguments + `Operation`
+  prefix, the enclosing-method prefix behind it, static-ness, return
+  type, and that the `original.call` array receives exactly the receiver
+  plus the wrapped arguments (counted through the `ANewArray`/
+  `AAStore` sequence). A wrong layout now fails `./gradlew build`
+  instead of the player's game.
+
+While in there, the remaining mixin targets (`Screen`, `ChatScreen`,
+`AbstractContainerScreen`) were re-audited against the same 26.3
+bytecode — targets and shadows all match; this handler was the only
+defect in the mixin surface.
+
+### Tests performed
+
+- `./gradlew build` green; 499 tests, 0 failures (was 498). The new
+  signature test passes against the fixed tree; during development it
+  correctly flagged a handler-shape question (full-descriptor method
+  specs like `extractRenderState(...)V` needed the return type kept in
+  the enclosing-method resolution) before going green.
+- `javap` on the built class: the `zea$tintMentionedLine` descriptor is
+  character-identical to the crash log's expected descriptor.
+- In-game testing: none available in this environment. The mixin now
+  satisfies the exact contract the runtime enforces at apply time — the
+  player's next dev-build run confirms it end to end.
+
+### Outstanding problems
+
+- In-game verification of the whole chat surface (tabs, search, copy,
+  multi-send, mention tint) still pending the player's next session —
+  dev.19 carries this fix.
+- The 239-mod environment co-targets `ChatComponent` (chatting,
+  OneConfig's chat events). MixinExtras chains wraps through the
+  `Operation` interface, so coexistence should be structural; the
+  player's log will tell.
