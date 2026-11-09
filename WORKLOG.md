@@ -972,3 +972,74 @@ search transparently covers previous sessions' messages.
 
 - Stage 4 leftovers and the edit-screen test gap are unchanged.
 - Stage 8 (HelpChat sharing) is the last Phase 1 stage.
+
+## 2026-11-09 (session 9) — Stage 8: HelpChat configuration sharing
+
+### Work done
+
+Five commits, each landing with its tests:
+
+- `ShareType`/`ShareDocument` — the `{format, type, version, data}`
+  envelope. Strict identity: the format marker must match, the type must
+  be known, versions this build does not understand are rejected, never
+  guessed; unknown envelope fields are ignored for forward compatibility.
+- `PasteKey` — accepts a bare key or a paste URL, but only
+  `https://paste.helpcha.at`, only one key segment (with optional
+  presentation extension like `.java`), no queries or fragments. The
+  key charset `[A-Za-z0-9_-]` keeps every traversal shape out before
+  any URL is built.
+- `PasteService` — HTTP client on an injected bounded executor.
+  POST `text/plain; charset=utf-8` to `/documents`, validate the
+  returned key; GET `/raw/{key}` with a 1 MB cap (bytes buffered, then
+  decoded once — chunk-wise UTF-8 decoding can split a character).
+  Redirects are never followed. Every failure is a player-readable
+  `ShareException`.
+- Payload codecs — `InventoryButtonsPayload` (wire shape mirrors the
+  button store's file, but imports validate strictly: unusable entry,
+  duplicated identity or >100 buttons rejects the whole import) and
+  `GeneralConfigPayload` (allowlist of behavior settings; history and
+  internals excluded by construction; absent fields keep the current
+  value; validate-everything-then-apply).
+- Wiring — `ShareCoordinator` (exports round-trip their own document
+  before uploading; imports hold as pending until confirmed; futures
+  marshal to the client thread), `/zea share|import` commands, the
+  `ZEA-Share` executor closed on shutdown, and `applyImport` on the
+  buttons facade.
+
+### Research performed and findings
+
+- fabric-command-api-v2 3.1.2 (the version fabric-api 0.165.2 resolves)
+  has no `ClientCommandManager`; the entry points are
+  `ClientCommands.literal/argument` and the callback's second parameter
+  is a `CommandBuildContext`. Pinned by compiling against them.
+- Brigadier's `getRelevantNodes` prefers an exactly-matching literal
+  child over a sibling argument, so `/zea import confirm` coexists with
+  the greedy paste argument; a paste key that literally spells "confirm"
+  is still importable by pasting the full URL.
+- MC 26.3 feedback surface: `Hud.getChat()` → `ChatComponent
+  .addClientSystemMessage` exists, but `FabricClientCommandSource
+  .sendFeedback/sendError` is the idiomatic path and needs no direct
+  chat access — used instead.
+
+### Tests performed
+
+- `./gradlew build` green; 443 tests, 0 failures. New: 15 envelope, 18
+  paste key, 15 paste client (mock HTTP server — no test touches
+  paste.helpcha.at), 14 button payload, 12 general payload (including
+  the allowlist exclusion test: an export with history configured must
+  not contain the word "history"), 14 coordinator (fake transport).
+- Test bugs fixed before landing: a self-contradictory URL assertion,
+  fixtures missing their icon field, and a text block whose JSON escapes
+  were processed at the Java level instead of the JSON level.
+- In-game testing: none available in this environment. Live protocol
+  verification against the real paste service remains blocked by the
+  NXDOMAIN from here — mock-tested only, as documented.
+
+### Outstanding problems
+
+- Live HelpChat verification (needs a network that resolves
+  paste.helpcha.at, ideally an in-game pass).
+- Stage 4 leftovers (nickname username display depends on data EarthMC's
+  API does not expose) and the inventory edit-screen test gap remain.
+- Phase 1 stages are now all implemented to the unit-tested level; the
+  remaining Phase 1 work is in-game verification of the whole build.

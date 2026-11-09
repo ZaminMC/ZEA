@@ -118,17 +118,37 @@ verification pending (bytecode-verified mixins, unit-tested logic).
 
 **Deliverable:** stable inventory-button functionality.
 
-## Stage 7 — Persistent history
+## Stage 7 — Persistent history ✅
 
 Server identity key, session storage, persistent storage, search, retention,
 recovery. Isolated to the EarthMC server context.
 
+Done: `ServerIdentity` (the dialed address, not the MOTD brand) keys
+per-server files under `zea/history/`; the bounded `ChatHistory` buffer
+that Stage 4 search already reads is seeded on join and flushed on
+disconnect; `HistoryStore` persists through the safe-write protocol with
+per-entry tolerance; `HistoryRecorder` batches writes (30 s), re-enforces
+retention (5 min) and drains on shutdown through a bounded executor.
+In-game verification pending (unit-tested logic, no mixin changes).
+
 **Deliverable:** EarthMC-specific persistent chat history.
 
-## Stage 8 — HelpChat configuration sharing
+## Stage 8 — HelpChat configuration sharing ✅
 
 Versioned JSON share schemas, export, paste upload, import with validation
 and preview, safe application, mock-server tests.
+
+Done: `zea-share` envelope with strict format/type/version checks; paste
+key parsing pinned to `https://paste.helpcha.at` (bare keys, presentation
+and raw URLs, extension stripping, traversal rejection); `PasteService`
+on a bounded executor (never follows redirects, 1 MB download cap,
+player-readable failures); payload codecs — buttons import strictly
+(unusable entry, duplicate identity or oversized set rejects the whole
+import), general shares an allowlist of behavior settings that excludes
+history by construction; `/zea share|import` commands with a two-step
+confirm; mock-server and fake-transport tests throughout. Live protocol
+verification against the real service still pending (NXDOMAIN from the
+development environment); see [docs/PASTE_SERVICE.md](docs/PASTE_SERVICE.md).
 
 **Deliverable:** working configuration sharing through HelpChat.
 

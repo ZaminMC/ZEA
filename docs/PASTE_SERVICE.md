@@ -3,9 +3,9 @@
 ZEA's configuration sharing uses HelpChat's paste service. This document
 records the protocol and ZEA's obligations. The hostname currently does not
 resolve from the development environment (NXDOMAIN, 2026-11-08), so live
-protocol verification is **pending**; implementation (Stage 8) is tested
-against an embedded mock HTTP server and must be verified live before any
-claim of working integration.
+protocol verification is **pending**; the implementation is tested against
+an embedded mock HTTP server and a fake transport, and must be verified
+live before any claim of working integration.
 
 ## Service
 
@@ -65,8 +65,49 @@ shareable. Only share-scoped configuration fields are serialized.
 
 ## Workflow
 
-Export: choose category → serialize → validate → upload async → copy URL →
-confirm.
-Import: paste key/URL → validate host/path → fetch raw async → size cap →
-parse → validate format/type/version → validate every entry → preview →
-confirm → apply atomically.
+Implemented as client commands (no UI dependency):
+
+```
+/zea share inven     export the inventory-button set
+/zea share gen       export shareable general settings
+/zea import <key>    fetch and validate a paste (key or full URL)
+/zea import confirm  apply the pending import
+/zea import cancel   discard it
+```
+
+Export: serialize the live state → round-trip the document (an export
+that cannot be imported back never uploads) → upload async → the paste
+URL is shown in chat. Unfinished buttons (no command or icon) are left
+out and noted.
+
+Import: paste key/URL → validate host/path → fetch raw async → size
+cap → parse → validate format/type/version → validate every entry →
+preview in chat → **nothing applies until `/zea import confirm`**. At
+most one import is pending; a new fetch discards the old one.
+
+## Import policies
+
+Per category, decided and pinned by tests:
+
+- **Inventory buttons — strict.** An entry without a command or icon, a
+  duplicated identity, or a set over 100 buttons rejects the whole
+  import. The local file tolerates hand-editing damage (per-entry
+  recovery at load), but an import replaces the set wholesale and must
+  be trustworthy as a whole. Imported buttons are inert data; nothing
+  in the import path can send a command.
+- **General — allowlist, field-optional.** Only the shareable fields
+  decode; anything the share omits keeps the current value; every field
+  validates before any is applied (one bad value rejects the import);
+  numeric ranges clamp through the same bounds the config accessors use.
+  Excluded by construction: chat history (local storage policy), schema
+  versions, save hooks — and any future field is excluded unless it is
+  explicitly added to the allowlist.
+
+## Threading
+
+Uploads and downloads run on the `ZEA-Share` executor (one daemon
+thread, bounded queue); results marshal back to the client thread
+before any feedback. The executor and HTTP client close on client
+shutdown. Redirects are never followed: the service's endpoints answer
+directly, so a redirect is a failure, not a silent detour to another
+host.

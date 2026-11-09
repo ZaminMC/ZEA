@@ -63,7 +63,7 @@ Packages represent responsibilities. The mapping:
 | `net.zaminmc.zea.mention` | Mention detection and (opt-in) responses |
 | `net.zaminmc.zea.player` | Player hover cards, username resolution |
 | `net.zaminmc.zea.buttons` | Inventory buttons |
-| `net.zaminmc.zea.share` | HelpChat paste client, share schemas, import/export |
+| `net.zaminmc.zea.share` | Paste client, share envelope, payload codecs, coordinator, `/zea` commands |
 | `net.zaminmc.zea.earthmc` | EarthMC API client, server identity, ZEA-REPO data |
 | `net.zaminmc.zea.config` | Configuration (MoulConfig) |
 | `net.zaminmc.zea.persistence` | Atomic file IO, JSON store utilities |
@@ -142,7 +142,9 @@ dispatch is cancelled on disconnect by design.
 | Message capture, classification, rendering | Client thread only |
 | Persistence writes | Single dedicated executor, sequential per store |
 | History queries for search | Background executor, results marshalled back |
-| EarthMC API + ZEA-REPO + HelpChat HTTP | Shared bounded executor, never the client thread |
+| History writes | `ZEA-History` executor, sequential, drained on shutdown |
+| Share uploads/downloads | `ZEA-Share` executor, results marshalled to the client thread |
+| EarthMC API + ZEA-REPO HTTP (future) | Same pattern: bounded executor, never the client thread |
 
 Rules:
 
