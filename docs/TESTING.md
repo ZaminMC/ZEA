@@ -54,6 +54,14 @@ multiplayer disconnects) is verified manually in-game on the target version.
 Results are recorded in WORKLOG.md per release. Compilation and unit tests
 are never claimed as in-game verification.
 
+The multi-send interaction round (after dev.17) covers: shift-click
+toggling on each default tab (All and PMs must refuse with the read-only
+toast), the aqua marker on targeted tabs, plain-click select while
+targets are active, sending with targets selected (staggered server
+echoes, up-arrow recall of the plain text, close-on-submit unchanged),
+slash commands and blank sends staying vanilla, the acceptance toast,
+and target clearing on disconnect.
+
 Component-level fixtures come out of that round through `/zea capture`
 (see CHAT_CLASSIFICATION.md): captured files load through the test-side
 `CaptureFixtures`, which the bootstrap helper (`VanillaBootstrap`) makes

@@ -1286,3 +1286,55 @@ the transformed `Screen`.
 - The untracked multi-send interaction layer (`MultiSendInteraction`
   policy class) remains to be wired into the tab bar and chat screen —
   continuing next.
+
+## 2026-11-09 — Stage 3 completion: multi-send interaction layer
+
+### Context
+
+The multi-send backend existed end to end since Stage 3's core work —
+`SendTargets`, `OutgoingRouter`, the staggered `MultiChannelDispatcher`,
+`sendToTargets` on `ChatSubsystem` — but had no callers: no way to select
+targets, no way for a typed message to become a dispatch. This closes
+that gap; it is the actual last code item of Stage 3's chat-surface plan.
+
+### Files changed
+
+- `MultiSendInteraction` (chat/feeds, new) — the pure interaction
+  policy: which feeds can become targets (channel-backed only), when a
+  chat send becomes a multi-target dispatch (plain text, non-blank,
+  enabled, targets selected — slash commands stay vanilla because a
+  player typing a command means the command), and which tabs render as
+  targeted.
+- `ChatSubsystem` — owns the session's `SendTargets` (cleared on
+  disconnect next to the other display resets); the dispatch listener
+  became `DispatchFeedback`: failures toast in addition to logging.
+- `ChatTabBar` — shift-click toggles a tab's channel as a send target;
+  targeted tabs render an aqua label with a thin marker strip so
+  selected-and-targeted stays unambiguous. Narration marks targeted
+  tabs.
+- `MultiSendToast` (chat/render, new) — all multi-send feedback is
+  toast-based: the chat HUD is feed-filtered, so a client system
+  message would be invisible exactly when a channel tab is selected —
+  the multi-send situation.
+- `ChatScreenMixin` — wires the tab bar to the policy and intercepts
+  `handleChatInput` at HEAD: normalized text enters up-arrow recall,
+  the batch dispatches, and cancelling preserves vanilla's
+  close-on-submit/clear behavior (verified against the 26.3 bytecode:
+  the caller performs both after `handleChatInput` returns).
+
+### Tests performed
+
+- `./gradlew build` green; 498 tests, 0 failures (was 490). New:
+  `MultiSendInteractionTest` (8 tests) — channel-feed to write-channel
+  mapping across the whole `Channels` table, read-only feeds refusing
+  without disturbing the selection, disabled-flag refusal, add/remove
+  toggling, interception gating (blank, null, slash, disabled, empty),
+  targeted rendering state.
+- In-game testing: none available in this environment; the round is
+  specified in TESTING.md for the next dev-build run.
+
+### Outstanding problems
+
+- In-game verification of the whole chat surface (tabs, search, copy,
+  multi-send) still pending the player's next session — dev.17 carries
+  the launch-crash fix, so a run is finally possible again.
