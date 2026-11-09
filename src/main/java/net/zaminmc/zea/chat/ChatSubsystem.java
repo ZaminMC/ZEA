@@ -17,6 +17,8 @@ import net.zaminmc.zea.chat.feeds.MultiSendResult;
 import net.zaminmc.zea.chat.feeds.OutgoingMessage;
 import net.zaminmc.zea.chat.feeds.OutgoingRouter;
 import net.zaminmc.zea.chat.feeds.SendTargets;
+import net.zaminmc.zea.chat.history.ChatHistory;
+import net.zaminmc.zea.chat.history.HistoryEntry;
 import net.zaminmc.zea.chat.model.CapturedMessage;
 import net.zaminmc.zea.chat.model.ClassifiedMessage;
 import net.zaminmc.zea.chat.model.WritingChannelReport;
@@ -48,6 +50,7 @@ public final class ChatSubsystem {
         private final Notifications notifications;
         private final Mentions mentions;
         private final MentionAutoResponder autoResponder;
+        private final ChatHistory history;
 
         public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification, ZeaConfig config) {
                 this.classification = classification;
@@ -60,6 +63,7 @@ public final class ChatSubsystem {
                 this.notifications = new Notifications(new HudNotificationSurface(), config, new UiNotificationSound());
                 this.autoResponder = new MentionAutoResponder(config,
                                 message -> dispatcher.dispatch(List.of(message)));
+                this.history = new ChatHistory(config.historyMaxEntries());
                 this.mentions = new Mentions(
                                 () -> Minecraft.getInstance().getUser().getName(),
                                 this.notifications,
@@ -82,6 +86,9 @@ public final class ChatSubsystem {
                         feedSelection.select(Feeds.ALL);
                         feedFilter.setSearchQuery(null);
                         feedFilter.apply(client.gui.hud.getChat());
+                        // Session-scoped history ends with the session; the persistent
+                        // store (Stage 7) reloads on the next EarthMC join.
+                        history.clear();
                 });
 
                 new MessageCapture(lifecycle::onEarthMc, this::onCaptured);
@@ -95,6 +102,9 @@ public final class ChatSubsystem {
                 }
                 notifications.onClassified(classified, System.currentTimeMillis());
                 mentions.onClassified(classified, System.currentTimeMillis());
+                if (!captured.text().isBlank()) {
+                        history.append(HistoryEntry.of(classified));
+                }
                 ZeaClient.LOGGER.debug("Classified [{}] {}", classified.category(), captured.text());
         }
 
@@ -140,6 +150,11 @@ public final class ChatSubsystem {
 
         public Mentions mentions() {
                 return mentions;
+        }
+
+        /** The session's bounded chat history. */
+        public ChatHistory history() {
+                return history;
         }
 
         private void sendCommand(OutgoingMessage message) throws Exception {
