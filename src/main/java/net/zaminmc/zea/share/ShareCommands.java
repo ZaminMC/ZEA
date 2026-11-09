@@ -22,8 +22,10 @@ import java.util.concurrent.CompletionException;
  * <p>Handlers never block: network work runs on the share executor and
  * feedback arrives as a client message when it completes. Brigadier
  * matches the literal children ({@code confirm}, {@code cancel}) before
- * the greedy paste argument, so a paste key that spells "confirm" is
- * still reachable by pasting the full URL instead.
+ * the paste argument, so a paste key that spells "confirm" is still
+ * reachable by pasting the full URL instead — and the paste argument
+ * rejects exactly those two reserved words, so Brigadier's ambiguity
+ * scan agrees and stays silent.
  *
  * <p>The {@code /zea} root itself is assembled once in the client
  * entrypoint; this class contributes its branches.
@@ -46,7 +48,7 @@ public final class ShareCommands {
 										.executes(context -> share(context, coordinator))))
 					.then(ClientCommands.literal("import")
 							.then(ClientCommands.argument("paste",
-											StringArgumentType.greedyString())
+											new ImportPasteArgument())
 											.executes(context -> beginImport(context, coordinator)))
 										.then(ClientCommands.literal("confirm")
 													.executes(context -> confirmImport(context, coordinator)))
@@ -83,7 +85,7 @@ public final class ShareCommands {
 
 	private static int beginImport(CommandContext<FabricClientCommandSource> context,
 			ShareCoordinator coordinator) {
-		String paste = StringArgumentType.getString(context, "paste");
+		String paste = ImportPasteArgument.get(context, "paste");
 		FabricClientCommandSource source = context.getSource();
 		source.sendFeedback(Component.literal("Fetching that paste…"));
 		coordinator.beginImport(paste).whenComplete((preview, error) -> {
