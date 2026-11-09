@@ -1,0 +1,99 @@
+name: live checks
+
+# Verifications that need real internet access to a third-party service,
+# which the development sandbox cannot reach (paste.helpcha.at resolves
+# NXDOMAIN there). Manual-only on purpose: never runs on push, never
+# gates a release, and fires only when a human asks — each run probes the
+# live service once with a clearly labeled throwaway document.
+#
+# Current check: the HelpChat paste protocol, i.e. every live assumption
+# PasteService/PasteKey encode — see docs/PASTE_SERVICE.md.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: live-checks
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  paste-service:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe the HelpChat paste protocol
+        run: |
+          set -euo pipefail
+          BASE="https://paste.helpcha.at"
+
+          # A valid zea-share envelope with multibyte characters, so the
+          # round-trip proves byte-exact UTF-8 handling, not just ASCII.
+          PROBE='{
+            "format": "zea-share",
+            "type": "general",
+            "version": 1,
+            "data": {
+              "note": "live protocol probe from ZEA CI — throwaway, not real settings",
+              "sample": "café ☃ — ünïcode ✓"
+            }
+          }'
+          printf '%s' "$PROBE" > probe.json
+
+          echo "::group::upload (POST /documents)"
+          # curl does not follow redirects by default; PasteService pins
+          # followRedirects(NEVER), so a 3xx here must surface as failure.
+          UPLOAD_CODE=$(curl -sS -o upload-response.json -w '%{http_code}' \
+            --max-time 30 \
+            -H 'Content-Type: text/plain; charset=utf-8' \
+            --data-binary @probe.json \
+            "$BASE/documents")
+          echo "HTTP $UPLOAD_CODE"
+          cat upload-response.json; echo
+          case "$UPLOAD_CODE" in 2*) ;; *)
+            echo "::error::upload answered HTTP $UPLOAD_CODE, expected a direct 2xx"; exit 1 ;;
+          esac
+          echo "::endgroup::"
+
+          echo "::group::key validation"
+          KEY=$(jq -r '.key // empty' upload-response.json)
+          if [ -z "$KEY" ]; then
+            echo "::error::response JSON has no string 'key'"; cat upload-response.json; exit 1
+          fi
+          if ! printf '%s' "$KEY" | grep -qE '^[A-Za-z0-9_-]+$'; then
+            echo "::error::key '$KEY' fails the [A-Za-z0-9_-]+ charset PasteKey enforces"; exit 1
+          fi
+          if [ "${#KEY}" -gt 64 ]; then
+            echo "::error::key is ${#KEY} chars, PasteKey caps at 64"; exit 1
+          fi
+          echo "key: $KEY (len ${#KEY})"
+          echo "::endgroup::"
+
+          echo "::group::raw round-trip (GET /raw/{key})"
+          RAW_CODE=$(curl -sS -o downloaded.json -w '%{http_code}' \
+            --max-time 30 "$BASE/raw/$KEY")
+          echo "HTTP $RAW_CODE"
+          case "$RAW_CODE" in 2*) ;; *)
+            echo "::error::raw download answered HTTP $RAW_CODE, expected a direct 2xx"; exit 1 ;;
+          esac
+          if ! cmp -s probe.json downloaded.json; then
+            echo "::error::raw document differs from the uploaded one (UTF-8 byte-exact expected)"; \
+            diff <(cat probe.json) <(cat downloaded.json) || true; exit 1
+          fi
+          echo "byte-identical round-trip OK"
+          echo "::endgroup::"
+
+          echo "::group::informational URL forms"
+          # The presentation URL ZEA shows players, and the extension form
+          # PasteKey strips — recorded, not asserted (only what the mod
+          # fetches directly must answer without a redirect).
+          PRES_CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$BASE/$KEY")
+          echo "presentation /$KEY -> HTTP $PRES_CODE"
+          RAWEXT_CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 30 "$BASE/raw/$KEY.java")
+          echo "raw extension form /raw/$KEY.java -> HTTP $RAWEXT_CODE"
+          echo "::endgroup::"
+
+          echo
+          echo "probe document lives at $BASE/$KEY (retained per the service's own policy)"
