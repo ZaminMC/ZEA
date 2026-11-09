@@ -9,9 +9,9 @@ import java.util.concurrent.CompletableFuture;
  * machine is testable without a network stack.
  */
 public interface PasteTransport {
-        /** Uploads a document and completes with its key. */
-        CompletableFuture<PasteKey> upload(String document);
+	/** Uploads a document and completes with its key. */
+	CompletableFuture<PasteKey> upload(String document);
 
-        /** Downloads a raw document and completes with its text. */
-        CompletableFuture<String> download(PasteKey key);
+	/** Downloads a raw document and completes with its text. */
+	CompletableFuture<String> download(PasteKey key);
 }

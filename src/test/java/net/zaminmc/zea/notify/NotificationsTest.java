@@ -22,166 +22,166 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * both the notice and the sound.
  */
 class NotificationsTest {
-        private static final long NOW = 1_000_000;
+	private static final long NOW = 1_000_000;
 
-        private final RecordingSurface surface = new RecordingSurface();
-        private final RecordingSound sound = new RecordingSound();
-        private final ZeaConfig config = new ZeaConfig();
-        private final Notifications notifications = new Notifications(surface, config, sound);
+	private final RecordingSurface surface = new RecordingSurface();
+	private final RecordingSound sound = new RecordingSound();
+	private final ZeaConfig config = new ZeaConfig();
+	private final Notifications notifications = new Notifications(surface, config, sound);
 
-        @Test
-        void incomingPrivateMessagePostsPersistentNotification() {
-                notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
+	@Test
+	void incomingPrivateMessagePostsPersistentNotification() {
+		notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
 
-                assertEquals(1, surface.actionBars.size());
-                assertTrue(surface.actionBars.get(0).startsWith("PM from Coriolanus: psst"));
-                assertEquals("Coriolanus", notifications.coordinator().showing().orElseThrow().key());
-        }
+		assertEquals(1, surface.actionBars.size());
+		assertTrue(surface.actionBars.get(0).startsWith("PM from Coriolanus: psst"));
+		assertEquals("Coriolanus", notifications.coordinator().showing().orElseThrow().key());
+	}
 
-        @Test
-        void notificationTextIsStyledAndCarriesTheContent() {
-                notifications.onClassified(pm("Coriolanus", "hello there", PrivateMessage.Direction.INCOMING), NOW);
+	@Test
+	void notificationTextIsStyledAndCarriesTheContent() {
+		notifications.onClassified(pm("Coriolanus", "hello there", PrivateMessage.Direction.INCOMING), NOW);
 
-                String text = notifications.coordinator().showing().orElseThrow().text().getString();
-                assertEquals("PM from Coriolanus: hello there", text);
-        }
+		String text = notifications.coordinator().showing().orElseThrow().text().getString();
+		assertEquals("PM from Coriolanus: hello there", text);
+	}
 
-        @Test
-        void longContentIsTruncatedForTheActionBar() {
-                notifications.onClassified(pm("Coriolanus", "x".repeat(200), PrivateMessage.Direction.INCOMING), NOW);
+	@Test
+	void longContentIsTruncatedForTheActionBar() {
+		notifications.onClassified(pm("Coriolanus", "x".repeat(200), PrivateMessage.Direction.INCOMING), NOW);
 
-                String text = notifications.coordinator().showing().orElseThrow().text().getString();
-                assertTrue(text.length() <= "PM from Coriolanus: ".length() + 60, "preview is bounded");
-                assertTrue(text.endsWith("..."));
-        }
+		String text = notifications.coordinator().showing().orElseThrow().text().getString();
+		assertTrue(text.length() <= "PM from Coriolanus: ".length() + 60, "preview is bounded");
+		assertTrue(text.endsWith("..."));
+	}
 
-        @Test
-        void incomingPrivateMessagePlaysCue() {
-                notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
+	@Test
+	void incomingPrivateMessagePlaysCue() {
+		notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
 
-                assertEquals(List.of(NotificationKind.PRIVATE_MESSAGE), sound.played);
-        }
+		assertEquals(List.of(NotificationKind.PRIVATE_MESSAGE), sound.played);
+	}
 
-        @Test
-        void replyResolvesThePrivateMessageNotification() {
-                notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
+	@Test
+	void replyResolvesThePrivateMessageNotification() {
+		notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
 
-                notifications.onClassified(pm("Coriolanus", "hi", PrivateMessage.Direction.OUTGOING), NOW + 100);
+		notifications.onClassified(pm("Coriolanus", "hi", PrivateMessage.Direction.OUTGOING), NOW + 100);
 
-                assertTrue(notifications.coordinator().showing().isEmpty());
-                assertTrue(surface.cleared);
-        }
+		assertTrue(notifications.coordinator().showing().isEmpty());
+		assertTrue(surface.cleared);
+	}
 
-        @Test
-        void replyToSomeoneElseKeepsTheNotification() {
-                notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
+	@Test
+	void replyToSomeoneElseKeepsTheNotification() {
+		notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
 
-                notifications.onClassified(pm("pengpy", "hi", PrivateMessage.Direction.OUTGOING), NOW + 100);
+		notifications.onClassified(pm("pengpy", "hi", PrivateMessage.Direction.OUTGOING), NOW + 100);
 
-                assertEquals("Coriolanus", notifications.coordinator().showing().orElseThrow().key());
-        }
+		assertEquals("Coriolanus", notifications.coordinator().showing().orElseThrow().key());
+	}
 
-        @Test
-        void disabledNotificationsShowNothingButStillResolve() {
-                config.notifications.pmNotifications = false;
+	@Test
+	void disabledNotificationsShowNothingButStillResolve() {
+		config.notifications.pmNotifications = false;
 
-                notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
+		notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
 
-                assertEquals(0, surface.actionBars.size());
-                assertEquals(0, sound.played.size());
+		assertEquals(0, surface.actionBars.size());
+		assertEquals(0, sound.played.size());
 
-                // The reply path stays active: no stale notice can linger.
-                notifications.onClassified(pm("Coriolanus", "hi", PrivateMessage.Direction.OUTGOING), NOW + 100);
-        }
+		// The reply path stays active: no stale notice can linger.
+		notifications.onClassified(pm("Coriolanus", "hi", PrivateMessage.Direction.OUTGOING), NOW + 100);
+	}
 
-        @Test
-        void disabledSoundStaysSilent() {
-                config.notifications.pmSound = false;
+	@Test
+	void disabledSoundStaysSilent() {
+		config.notifications.pmSound = false;
 
-                notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
+		notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
 
-                assertEquals(1, surface.actionBars.size());
-                assertEquals(0, sound.played.size());
-        }
+		assertEquals(1, surface.actionBars.size());
+		assertEquals(0, sound.played.size());
+	}
 
-        @Test
-        void titleDestinationIsConfigurable() {
-                config.notifications.pmDestination = Notification.Destination.TITLE;
+	@Test
+	void titleDestinationIsConfigurable() {
+		config.notifications.pmDestination = Notification.Destination.TITLE;
 
-                notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
+		notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
 
-                assertEquals(0, surface.actionBars.size());
-                assertEquals(1, surface.titles.size());
-        }
+		assertEquals(0, surface.actionBars.size());
+		assertEquals(1, surface.titles.size());
+	}
 
-        @Test
-        void unsetDestinationFallsBackToActionBar() {
-                config.notifications.pmDestination = null;
+	@Test
+	void unsetDestinationFallsBackToActionBar() {
+		config.notifications.pmDestination = null;
 
-                notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
+		notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
 
-                assertEquals(1, surface.actionBars.size());
-        }
+		assertEquals(1, surface.actionBars.size());
+	}
 
-        @Test
-        void nonPrivateMessagesAreIgnored() {
-                notifications.onClassified(ClassifiedMessage.unclassified(
-                                CapturedMessage.of(Component.literal("[Town] Someone: hi"), Instant.EPOCH)), NOW);
+	@Test
+	void nonPrivateMessagesAreIgnored() {
+		notifications.onClassified(ClassifiedMessage.unclassified(
+				CapturedMessage.of(Component.literal("[Town] Someone: hi"), Instant.EPOCH)), NOW);
 
-                assertEquals(0, surface.actionBars.size());
-                assertEquals(0, sound.played.size());
-        }
+		assertEquals(0, surface.actionBars.size());
+		assertEquals(0, sound.played.size());
+	}
 
-        @Test
-        void disconnectClears() {
-                notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
+	@Test
+	void disconnectClears() {
+		notifications.onClassified(pm("Coriolanus", "psst", PrivateMessage.Direction.INCOMING), NOW);
 
-                notifications.clear();
+		notifications.clear();
 
-                assertTrue(notifications.coordinator().showing().isEmpty());
-        }
+		assertTrue(notifications.coordinator().showing().isEmpty());
+	}
 
-        private ClassifiedMessage pm(String other, String content, PrivateMessage.Direction direction) {
-                PrivateMessage payload = switch (direction) {
-                        case INCOMING -> new PrivateMessage(other, "me", direction, content);
-                        case OUTGOING -> new PrivateMessage("me", other, direction, content);
-                };
-                return new ClassifiedMessage(
-                                CapturedMessage.of(Component.literal("[" + other + " → me] " + content), Instant.EPOCH),
-                                MessageCategory.PRIVATE_MESSAGE, payload);
-        }
+	private ClassifiedMessage pm(String other, String content, PrivateMessage.Direction direction) {
+		PrivateMessage payload = switch (direction) {
+			case INCOMING -> new PrivateMessage(other, "me", direction, content);
+			case OUTGOING -> new PrivateMessage("me", other, direction, content);
+		};
+		return new ClassifiedMessage(
+				CapturedMessage.of(Component.literal("[" + other + " → me] " + content), Instant.EPOCH),
+				MessageCategory.PRIVATE_MESSAGE, payload);
+	}
 
-        private static final class RecordingSurface implements NotificationSurface {
-                private record TitleCall(String title, String subtitle) {
-                }
+	private static final class RecordingSurface implements NotificationSurface {
+		private record TitleCall(String title, String subtitle) {
+		}
 
-                private final List<String> actionBars = new ArrayList<>();
-                private final List<TitleCall> titles = new ArrayList<>();
-                private boolean cleared;
+		private final List<String> actionBars = new ArrayList<>();
+		private final List<TitleCall> titles = new ArrayList<>();
+		private boolean cleared;
 
-                @Override
-                public void showActionBar(Component text) {
-                        actionBars.add(text.getString());
-                }
+		@Override
+		public void showActionBar(Component text) {
+			actionBars.add(text.getString());
+		}
 
-                @Override
-                public void showTitle(Component title, Component subtitle, int fadeInTicks, int stayTicks,
-                                int fadeOutTicks) {
-                        titles.add(new TitleCall(title.getString(), subtitle == null ? null : subtitle.getString()));
-                }
+		@Override
+		public void showTitle(Component title, Component subtitle, int fadeInTicks, int stayTicks,
+				int fadeOutTicks) {
+			titles.add(new TitleCall(title.getString(), subtitle == null ? null : subtitle.getString()));
+		}
 
-                @Override
-                public void clear() {
-                        cleared = true;
-                }
-        }
+		@Override
+		public void clear() {
+			cleared = true;
+		}
+	}
 
-        private static final class RecordingSound implements NotificationSound {
-                private final List<NotificationKind> played = new ArrayList<>();
+	private static final class RecordingSound implements NotificationSound {
+		private final List<NotificationKind> played = new ArrayList<>();
 
-                @Override
-                public void play(NotificationKind kind) {
-                        played.add(kind);
-                }
-        }
+		@Override
+		public void play(NotificationKind kind) {
+			played.add(kind);
+		}
+	}
 }

@@ -23,234 +23,234 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HistoryRecorderTest {
-        @TempDir
-        Path dir;
+	@TempDir
+	Path dir;
 
-        private static final ServerIdentity EARTHMC = new ServerIdentity("earthmc.net");
+	private static final ServerIdentity EARTHMC = new ServerIdentity("earthmc.net");
 
-        /** Wall clock the recorder sees; mutated by tests to advance time. */
-        private final long[] now = {0};
+	/** Wall clock the recorder sees; mutated by tests to advance time. */
+	private final long[] now = {0};
 
-        private HistoryRecorder recorder(ChatHistory history, ZeaConfig config, Executor executor) {
-                return new HistoryRecorder(history, config, executor, () -> now[0], Runnable::run);
-        }
+	private HistoryRecorder recorder(ChatHistory history, ZeaConfig config, Executor executor) {
+		return new HistoryRecorder(history, config, executor, () -> now[0], Runnable::run);
+	}
 
-        private static HistoryEntry entry(String text, long epochMilli) {
-                return new HistoryEntry(Instant.ofEpochMilli(epochMilli), MessageCategory.GLOBAL, text, text);
-        }
+	private static HistoryEntry entry(String text, long epochMilli) {
+		return new HistoryEntry(Instant.ofEpochMilli(epochMilli), MessageCategory.GLOBAL, text, text);
+	}
 
-        private Path historyFile() {
-                return dir.resolve("history").resolve(EARTHMC.fileSafeName() + ".json");
-        }
+	private Path historyFile() {
+		return dir.resolve("history").resolve(EARTHMC.fileSafeName() + ".json");
+	}
 
-        @Test
-        void startSeedsHistoryFromTheServerFile() throws IOException {
-                Files.createDirectories(historyFile().getParent());
-                new HistoryStore(historyFile()).save(List.of(entry("old", 1_000)));
-                ChatHistory history = new ChatHistory(10);
-                HistoryRecorder recorder = recorder(history, new ZeaConfig(), Runnable::run);
+	@Test
+	void startSeedsHistoryFromTheServerFile() throws IOException {
+		Files.createDirectories(historyFile().getParent());
+		new HistoryStore(historyFile()).save(List.of(entry("old", 1_000)));
+		ChatHistory history = new ChatHistory(10);
+		HistoryRecorder recorder = recorder(history, new ZeaConfig(), Runnable::run);
 
-                recorder.start(dir.resolve("history"), EARTHMC);
+		recorder.start(dir.resolve("history"), EARTHMC);
 
-                assertEquals(List.of("old"), history.snapshot().stream().map(HistoryEntry::plainText).toList());
-        }
+		assertEquals(List.of("old"), history.snapshot().stream().map(HistoryEntry::plainText).toList());
+	}
 
-        @Test
-        void startWithPersistenceDisabledKeepsTheSessionInMemoryOnly() throws IOException {
-                Files.createDirectories(historyFile().getParent());
-                new HistoryStore(historyFile()).save(List.of(entry("old", 1_000)));
-                ZeaConfig config = new ZeaConfig();
-                config.history.enabled = false;
-                ChatHistory history = new ChatHistory(10);
-                HistoryRecorder recorder = recorder(history, config, Runnable::run);
+	@Test
+	void startWithPersistenceDisabledKeepsTheSessionInMemoryOnly() throws IOException {
+		Files.createDirectories(historyFile().getParent());
+		new HistoryStore(historyFile()).save(List.of(entry("old", 1_000)));
+		ZeaConfig config = new ZeaConfig();
+		config.history.enabled = false;
+		ChatHistory history = new ChatHistory(10);
+		HistoryRecorder recorder = recorder(history, config, Runnable::run);
 
-                recorder.start(dir.resolve("history"), EARTHMC);
-                history.append(entry("session", now[0]));
+		recorder.start(dir.resolve("history"), EARTHMC);
+		history.append(entry("session", now[0]));
 
-                assertEquals(List.of("session"),
-                                history.snapshot().stream().map(HistoryEntry::plainText).toList());
-                List<HistoryEntry> onDisk = new HistoryStore(historyFile()).load(100);
-                assertEquals(List.of("old"),
-                                onDisk.stream().map(HistoryEntry::plainText).toList(),
-                                "a disabled history must not touch any file");
-        }
+		assertEquals(List.of("session"),
+				history.snapshot().stream().map(HistoryEntry::plainText).toList());
+		List<HistoryEntry> onDisk = new HistoryStore(historyFile()).load(100);
+		assertEquals(List.of("old"),
+				onDisk.stream().map(HistoryEntry::plainText).toList(),
+				"a disabled history must not touch any file");
+	}
 
-        @Test
-        void tickWritesADirtyHistoryOnlyAfterTheFlushInterval() {
-                ChatHistory history = new ChatHistory(10);
-                HistoryRecorder recorder = recorder(history, new ZeaConfig(), Runnable::run);
-                recorder.start(dir.resolve("history"), EARTHMC);
+	@Test
+	void tickWritesADirtyHistoryOnlyAfterTheFlushInterval() {
+		ChatHistory history = new ChatHistory(10);
+		HistoryRecorder recorder = recorder(history, new ZeaConfig(), Runnable::run);
+		recorder.start(dir.resolve("history"), EARTHMC);
 
-                history.append(entry("one", now[0]));
-                recorder.markDirty();
-                now[0] = HistoryRecorder.FLUSH_INTERVAL_MILLIS - 1;
-                recorder.tick();
-                assertFalse(Files.exists(historyFile()), "nothing is written before the interval elapses");
+		history.append(entry("one", now[0]));
+		recorder.markDirty();
+		now[0] = HistoryRecorder.FLUSH_INTERVAL_MILLIS - 1;
+		recorder.tick();
+		assertFalse(Files.exists(historyFile()), "nothing is written before the interval elapses");
 
-                now[0] = HistoryRecorder.FLUSH_INTERVAL_MILLIS;
-                recorder.tick();
-                assertTrue(Files.exists(historyFile()), "a dirty history flushes on schedule");
+		now[0] = HistoryRecorder.FLUSH_INTERVAL_MILLIS;
+		recorder.tick();
+		assertTrue(Files.exists(historyFile()), "a dirty history flushes on schedule");
 
-                List<HistoryEntry> loaded = new HistoryStore(historyFile()).load(100);
-                assertEquals(List.of("one"), loaded.stream().map(HistoryEntry::plainText).toList());
-        }
+		List<HistoryEntry> loaded = new HistoryStore(historyFile()).load(100);
+		assertEquals(List.of("one"), loaded.stream().map(HistoryEntry::plainText).toList());
+	}
 
-        @Test
-        void cleanHistoriesAreNeverWritten() {
-                ChatHistory history = new ChatHistory(10);
-                HistoryRecorder recorder = recorder(history, new ZeaConfig(), Runnable::run);
-                recorder.start(dir.resolve("history"), EARTHMC);
+	@Test
+	void cleanHistoriesAreNeverWritten() {
+		ChatHistory history = new ChatHistory(10);
+		HistoryRecorder recorder = recorder(history, new ZeaConfig(), Runnable::run);
+		recorder.start(dir.resolve("history"), EARTHMC);
 
-                now[0] = HistoryRecorder.FLUSH_INTERVAL_MILLIS * 3;
-                recorder.tick();
+		now[0] = HistoryRecorder.FLUSH_INTERVAL_MILLIS * 3;
+		recorder.tick();
 
-                assertFalse(Files.exists(historyFile()), "no messages, no writes");
-        }
+		assertFalse(Files.exists(historyFile()), "no messages, no writes");
+	}
 
-        @Test
-        void writesCoalesceWhileOneIsInFlight() {
-                Deque<Runnable> queue = new ArrayDeque<>();
-                Executor deferring = queue::add;
-                ChatHistory history = new ChatHistory(10);
-                HistoryRecorder recorder = recorder(history, new ZeaConfig(), deferring);
-                recorder.start(dir.resolve("history"), EARTHMC);
-                queue.poll().run(); // the deferred load completes
+	@Test
+	void writesCoalesceWhileOneIsInFlight() {
+		Deque<Runnable> queue = new ArrayDeque<>();
+		Executor deferring = queue::add;
+		ChatHistory history = new ChatHistory(10);
+		HistoryRecorder recorder = recorder(history, new ZeaConfig(), deferring);
+		recorder.start(dir.resolve("history"), EARTHMC);
+		queue.poll().run(); // the deferred load completes
 
-                history.append(entry("one", now[0]));
-                recorder.markDirty();
-                now[0] = HistoryRecorder.FLUSH_INTERVAL_MILLIS;
-                recorder.tick();
-                assertTrue(recorder.writing(), "a write is in flight");
+		history.append(entry("one", now[0]));
+		recorder.markDirty();
+		now[0] = HistoryRecorder.FLUSH_INTERVAL_MILLIS;
+		recorder.tick();
+		assertTrue(recorder.writing(), "a write is in flight");
 
-                history.append(entry("two", now[0]));
-                recorder.markDirty();
-                now[0] += HistoryRecorder.FLUSH_INTERVAL_MILLIS;
-                recorder.tick();
-                assertEquals(1, queue.size(), "no second write while one is in flight");
+		history.append(entry("two", now[0]));
+		recorder.markDirty();
+		now[0] += HistoryRecorder.FLUSH_INTERVAL_MILLIS;
+		recorder.tick();
+		assertEquals(1, queue.size(), "no second write while one is in flight");
 
-                queue.poll().run(); // the in-flight save completes
-                assertFalse(recorder.writing());
+		queue.poll().run(); // the in-flight save completes
+		assertFalse(recorder.writing());
 
-                now[0] += HistoryRecorder.FLUSH_INTERVAL_MILLIS;
-                recorder.tick();
-                queue.poll().run(); // the coalesced write lands
-                assertTrue(Files.exists(historyFile()));
-                List<HistoryEntry> loaded = new HistoryStore(historyFile()).load(100);
-                assertEquals(List.of("one", "two"),
-                                loaded.stream().map(HistoryEntry::plainText).toList(),
-                                "the coalesced write must carry both messages");
-        }
+		now[0] += HistoryRecorder.FLUSH_INTERVAL_MILLIS;
+		recorder.tick();
+		queue.poll().run(); // the coalesced write lands
+		assertTrue(Files.exists(historyFile()));
+		List<HistoryEntry> loaded = new HistoryStore(historyFile()).load(100);
+		assertEquals(List.of("one", "two"),
+				loaded.stream().map(HistoryEntry::plainText).toList(),
+				"the coalesced write must carry both messages");
+	}
 
-        @Test
-        void stopFlushesPendingChangesAndEndsTheSession() {
-                ChatHistory history = new ChatHistory(10);
-                HistoryRecorder recorder = recorder(history, new ZeaConfig(), Runnable::run);
-                recorder.start(dir.resolve("history"), EARTHMC);
+	@Test
+	void stopFlushesPendingChangesAndEndsTheSession() {
+		ChatHistory history = new ChatHistory(10);
+		HistoryRecorder recorder = recorder(history, new ZeaConfig(), Runnable::run);
+		recorder.start(dir.resolve("history"), EARTHMC);
 
-                history.append(entry("last words", now[0]));
-                recorder.markDirty();
-                recorder.stop();
+		history.append(entry("last words", now[0]));
+		recorder.markDirty();
+		recorder.stop();
 
-                assertTrue(Files.exists(historyFile()), "disconnect must flush pending history");
-                assertEquals(0, history.size(), "the session ends with the connection");
+		assertTrue(Files.exists(historyFile()), "disconnect must flush pending history");
+		assertEquals(0, history.size(), "the session ends with the connection");
 
-                // And the next session seeds from what was flushed.
-                ChatHistory next = new ChatHistory(10);
-                HistoryRecorder nextRecorder = recorder(next, new ZeaConfig(), Runnable::run);
-                nextRecorder.start(dir.resolve("history"), EARTHMC);
-                assertEquals(List.of("last words"),
-                                next.snapshot().stream().map(HistoryEntry::plainText).toList());
-        }
+		// And the next session seeds from what was flushed.
+		ChatHistory next = new ChatHistory(10);
+		HistoryRecorder nextRecorder = recorder(next, new ZeaConfig(), Runnable::run);
+		nextRecorder.start(dir.resolve("history"), EARTHMC);
+		assertEquals(List.of("last words"),
+				next.snapshot().stream().map(HistoryEntry::plainText).toList());
+	}
 
-        @Test
-        void retentionRemovesExpiredEntriesOnItsSchedule() {
-                ZeaConfig config = new ZeaConfig();
-                config.history.retention = ZeaConfig.History.Retention.ONE_DAY;
-                ChatHistory history = new ChatHistory(100);
-                HistoryRecorder recorder = recorder(history, config, Runnable::run);
-                recorder.start(dir.resolve("history"), EARTHMC);
+	@Test
+	void retentionRemovesExpiredEntriesOnItsSchedule() {
+		ZeaConfig config = new ZeaConfig();
+		config.history.retention = ZeaConfig.History.Retention.ONE_DAY;
+		ChatHistory history = new ChatHistory(100);
+		HistoryRecorder recorder = recorder(history, config, Runnable::run);
+		recorder.start(dir.resolve("history"), EARTHMC);
 
-                history.append(entry("fresh", now[0]));
-                history.append(entry("stale", now[0] - 2L * 86_400_000));
-                history.append(entry("ancient", now[0] - 30L * 86_400_000));
-                recorder.markDirty();
+		history.append(entry("fresh", now[0]));
+		history.append(entry("stale", now[0] - 2L * 86_400_000));
+		history.append(entry("ancient", now[0] - 30L * 86_400_000));
+		recorder.markDirty();
 
-                now[0] = HistoryRecorder.RETENTION_INTERVAL_MILLIS;
-                recorder.tick(); // flushes and runs retention
+		now[0] = HistoryRecorder.RETENTION_INTERVAL_MILLIS;
+		recorder.tick(); // flushes and runs retention
 
-                assertEquals(List.of("fresh"),
-                                history.snapshot().stream().map(HistoryEntry::plainText).toList(),
-                                "entries older than the retention are dropped on schedule");
-                List<HistoryEntry> loaded = new HistoryStore(historyFile()).load(100);
-                assertEquals(List.of("fresh"),
-                                loaded.stream().map(HistoryEntry::plainText).toList(),
-                                "the shrinkage is persisted");
-        }
+		assertEquals(List.of("fresh"),
+				history.snapshot().stream().map(HistoryEntry::plainText).toList(),
+				"entries older than the retention are dropped on schedule");
+		List<HistoryEntry> loaded = new HistoryStore(historyFile()).load(100);
+		assertEquals(List.of("fresh"),
+				loaded.stream().map(HistoryEntry::plainText).toList(),
+				"the shrinkage is persisted");
+	}
 
-        @Test
-        void rejectedWritesAreRetriedOnLaterTicks() {
-                List<Boolean> rejections = new ArrayList<>(List.of(false, true));
-                Executor flaky = task -> {
-                        if (!rejections.isEmpty() && rejections.removeFirst()) {
-                                throw new RejectedExecutionException("busy");
-                        }
-                        task.run();
-                };
-                ChatHistory history = new ChatHistory(10);
-                HistoryRecorder recorder = recorder(history, new ZeaConfig(), flaky);
-                recorder.start(dir.resolve("history"), EARTHMC);
+	@Test
+	void rejectedWritesAreRetriedOnLaterTicks() {
+		List<Boolean> rejections = new ArrayList<>(List.of(false, true));
+		Executor flaky = task -> {
+			if (!rejections.isEmpty() && rejections.removeFirst()) {
+				throw new RejectedExecutionException("busy");
+			}
+			task.run();
+		};
+		ChatHistory history = new ChatHistory(10);
+		HistoryRecorder recorder = recorder(history, new ZeaConfig(), flaky);
+		recorder.start(dir.resolve("history"), EARTHMC);
 
-                history.append(entry("one", now[0]));
-                recorder.markDirty();
-                now[0] = HistoryRecorder.FLUSH_INTERVAL_MILLIS;
-                recorder.tick();
-                assertFalse(Files.exists(historyFile()), "the rejected write must not land");
+		history.append(entry("one", now[0]));
+		recorder.markDirty();
+		now[0] = HistoryRecorder.FLUSH_INTERVAL_MILLIS;
+		recorder.tick();
+		assertFalse(Files.exists(historyFile()), "the rejected write must not land");
 
-                now[0] += HistoryRecorder.FLUSH_INTERVAL_MILLIS;
-                recorder.tick();
-                assertTrue(Files.exists(historyFile()), "a busy executor is retried, not lost");
-        }
+		now[0] += HistoryRecorder.FLUSH_INTERVAL_MILLIS;
+		recorder.tick();
+		assertTrue(Files.exists(historyFile()), "a busy executor is retried, not lost");
+	}
 
-        @Test
-        void startIsolatesHistoryPerServer() {
-                ChatHistory history = new ChatHistory(10);
-                HistoryRecorder recorder = recorder(history, new ZeaConfig(), Runnable::run);
+	@Test
+	void startIsolatesHistoryPerServer() {
+		ChatHistory history = new ChatHistory(10);
+		HistoryRecorder recorder = recorder(history, new ZeaConfig(), Runnable::run);
 
-                ServerIdentity aurora = new ServerIdentity("aurora.earthmc.net");
-                recorder.start(dir.resolve("history"), aurora);
-                history.append(entry("aurora chat", now[0]));
-                recorder.markDirty();
-                recorder.stop();
+		ServerIdentity aurora = new ServerIdentity("aurora.earthmc.net");
+		recorder.start(dir.resolve("history"), aurora);
+		history.append(entry("aurora chat", now[0]));
+		recorder.markDirty();
+		recorder.stop();
 
-                recorder.start(dir.resolve("history"), EARTHMC);
-                assertEquals(0, history.size(), "another server's history starts empty");
-                history.append(entry("main chat", now[0]));
-                recorder.markDirty();
-                recorder.stop();
+		recorder.start(dir.resolve("history"), EARTHMC);
+		assertEquals(0, history.size(), "another server's history starts empty");
+		history.append(entry("main chat", now[0]));
+		recorder.markDirty();
+		recorder.stop();
 
-                List<HistoryEntry> auroraLoaded = new HistoryStore(
-                                                dir.resolve("history").resolve("aurora.earthmc.net.json")).load(100);
-                assertEquals(List.of("aurora chat"),
-                                auroraLoaded.stream().map(HistoryEntry::plainText).toList());
-                List<HistoryEntry> mainLoaded = new HistoryStore(historyFile()).load(100);
-                assertEquals(List.of("main chat"),
-                                mainLoaded.stream().map(HistoryEntry::plainText).toList());
-        }
+		List<HistoryEntry> auroraLoaded = new HistoryStore(
+						dir.resolve("history").resolve("aurora.earthmc.net.json")).load(100);
+		assertEquals(List.of("aurora chat"),
+				auroraLoaded.stream().map(HistoryEntry::plainText).toList());
+		List<HistoryEntry> mainLoaded = new HistoryStore(historyFile()).load(100);
+		assertEquals(List.of("main chat"),
+				mainLoaded.stream().map(HistoryEntry::plainText).toList());
+	}
 
-        @Test
-        void rejectedLoadLeavesAUsableSession() {
-                Executor rejecting = task -> {
-                        throw new RejectedExecutionException("closing");
-                };
-                ChatHistory history = new ChatHistory(10);
-                HistoryRecorder recorder = recorder(history, new ZeaConfig(), rejecting);
+	@Test
+	void rejectedLoadLeavesAUsableSession() {
+		Executor rejecting = task -> {
+			throw new RejectedExecutionException("closing");
+		};
+		ChatHistory history = new ChatHistory(10);
+		HistoryRecorder recorder = recorder(history, new ZeaConfig(), rejecting);
 
-                recorder.start(dir.resolve("history"), EARTHMC);
-                history.append(entry("still recorded", now[0]));
-                recorder.markDirty();
+		recorder.start(dir.resolve("history"), EARTHMC);
+		history.append(entry("still recorded", now[0]));
+		recorder.markDirty();
 
-                assertEquals(1, history.size(), "the session works without the loaded history");
-                assertEquals(Optional.of("still recorded"),
-                                history.snapshot().stream().map(HistoryEntry::plainText).findFirst());
-        }
+		assertEquals(1, history.size(), "the session works without the loaded history");
+		assertEquals(Optional.of("still recorded"),
+				history.snapshot().stream().map(HistoryEntry::plainText).findFirst());
+	}
 }

@@ -15,12 +15,12 @@ import net.zaminmc.zea.chat.model.MessageCategory;
  *                 auto-response would be sent to
  */
 public record Mention(CapturedMessage source, String speaker, String content, MessageCategory category) {
-        public Mention {
-                if (source == null || speaker == null || content == null || category == null) {
-                        throw new NullPointerException("mention fields must not be null");
-                }
-                if (speaker.isBlank()) {
-                        throw new IllegalArgumentException("speaker must not be blank");
-                }
-        }
+	public Mention {
+		if (source == null || speaker == null || content == null || category == null) {
+			throw new NullPointerException("mention fields must not be null");
+		}
+		if (speaker.isBlank()) {
+			throw new IllegalArgumentException("speaker must not be blank");
+		}
+	}
 }

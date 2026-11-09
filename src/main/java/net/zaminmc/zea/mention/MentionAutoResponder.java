@@ -37,66 +37,66 @@ import java.util.function.Consumer;
  * interval, cancelled on disconnect).
  */
 public final class MentionAutoResponder implements MentionResponder {
-        /** Hard ceiling per connection, independent of configuration. */
-        private static final int SESSION_CAP = 20;
+	/** Hard ceiling per connection, independent of configuration. */
+	private static final int SESSION_CAP = 20;
 
-        private final ZeaConfig config;
-        private final Consumer<OutgoingMessage> sender;
-        private final OutgoingRouter router = new OutgoingRouter();
-        private long lastResponseAt = Long.MIN_VALUE;
-        private int sentThisSession;
+	private final ZeaConfig config;
+	private final Consumer<OutgoingMessage> sender;
+	private final OutgoingRouter router = new OutgoingRouter();
+	private long lastResponseAt = Long.MIN_VALUE;
+	private int sentThisSession;
 
-        public MentionAutoResponder(ZeaConfig config, Consumer<OutgoingMessage> sender) {
-                this.config = config;
-                this.sender = sender;
-        }
+	public MentionAutoResponder(ZeaConfig config, Consumer<OutgoingMessage> sender) {
+		this.config = config;
+		this.sender = sender;
+	}
 
-        @Override
-        public void onMention(Mention mention, long now) {
-                if (!shouldRespond(mention, now)) {
-                        return;
-                }
-                channelFor(mention).ifPresent(channel -> {
-                        sender.accept(router.route(channel, config.autoResponseText()));
-                        lastResponseAt = now;
-                        sentThisSession++;
-                        ZeaClient.LOGGER.info("Auto-responded to a mention from {} on {}",
-                                        mention.speaker(), channel.id());
-                });
-        }
+	@Override
+	public void onMention(Mention mention, long now) {
+		if (!shouldRespond(mention, now)) {
+			return;
+		}
+		channelFor(mention).ifPresent(channel -> {
+			sender.accept(router.route(channel, config.autoResponseText()));
+			lastResponseAt = now;
+			sentThisSession++;
+			ZeaClient.LOGGER.info("Auto-responded to a mention from {} on {}",
+					mention.speaker(), channel.id());
+		});
+	}
 
-        /** Resets the cooldown and session counter; the disconnect path. */
-        public void reset() {
-                lastResponseAt = Long.MIN_VALUE;
-                sentThisSession = 0;
-        }
+	/** Resets the cooldown and session counter; the disconnect path. */
+	public void reset() {
+		lastResponseAt = Long.MIN_VALUE;
+		sentThisSession = 0;
+	}
 
-        /** How many responses were sent this session. */
-        public int responsesThisSession() {
-                return sentThisSession;
-        }
+	/** How many responses were sent this session. */
+	public int responsesThisSession() {
+		return sentThisSession;
+	}
 
-        private boolean shouldRespond(Mention mention, long now) {
-                if (!config.autoRespondEnabled()) {
-                        return false;
-                }
-                String response = config.autoResponseText();
-                if (response.isBlank()) {
-                        return false;
-                }
-                if (sentThisSession >= SESSION_CAP) {
-                        return false;
-                }
-                if (lastResponseAt != Long.MIN_VALUE && now - lastResponseAt < config.autoResponseCooldownMillis()) {
-                        return false;
-                }
-                // Loop guard: an incoming message that already carries our
-                // response text is an echo of an auto-response, not a person.
-                return !mention.content().contains(response);
-        }
+	private boolean shouldRespond(Mention mention, long now) {
+		if (!config.autoRespondEnabled()) {
+			return false;
+		}
+		String response = config.autoResponseText();
+		if (response.isBlank()) {
+			return false;
+		}
+		if (sentThisSession >= SESSION_CAP) {
+			return false;
+		}
+		if (lastResponseAt != Long.MIN_VALUE && now - lastResponseAt < config.autoResponseCooldownMillis()) {
+			return false;
+		}
+		// Loop guard: an incoming message that already carries our
+		// response text is an echo of an auto-response, not a person.
+		return !mention.content().contains(response);
+	}
 
-        /** The writable channel matching where the mention arrived. */
-        private static Optional<WriteChannel> channelFor(Mention mention) {
-                return Channels.byId(mention.category().name().toLowerCase(Locale.ROOT));
-        }
+	/** The writable channel matching where the mention arrived. */
+	private static Optional<WriteChannel> channelFor(Mention mention) {
+		return Channels.byId(mention.category().name().toLowerCase(Locale.ROOT));
+	}
 }

@@ -8,6 +8,6 @@ package net.zaminmc.zea.share;
  * separate step so nothing can apply half-validated data.
  */
 public interface SharePayload {
-        /** A one-line, player-readable description of the contents. */
-        String summary();
+	/** A one-line, player-readable description of the contents. */
+	String summary();
 }

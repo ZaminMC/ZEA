@@ -9,17 +9,17 @@ package net.zaminmc.zea.notify;
  * while a mention shows replaces it, never the other way around.
  */
 public enum NotificationKind {
-        PRIVATE_MESSAGE(2),
-        MENTION(1);
+	PRIVATE_MESSAGE(2),
+	MENTION(1);
 
-        private final int priority;
+	private final int priority;
 
-        NotificationKind(int priority) {
-                this.priority = priority;
-        }
+	NotificationKind(int priority) {
+		this.priority = priority;
+	}
 
-        /** Higher wins the surface; equal priority queues. */
-        public int priority() {
-                return priority;
-        }
+	/** Higher wins the surface; equal priority queues. */
+	public int priority() {
+		return priority;
+	}
 }

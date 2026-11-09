@@ -10,49 +10,49 @@ package net.zaminmc.zea.share;
  * shareable configuration warrants one.
  */
 public enum ShareType {
-        /** The inventory-button set: buttons, icons, positions, commands. */
-        INVENTORY_BUTTONS("inventory-buttons", "inven", 1),
+	/** The inventory-button set: buttons, icons, positions, commands. */
+	INVENTORY_BUTTONS("inventory-buttons", "inven", 1),
 
-        /** Shareable general configuration; never local data or secrets. */
-        GENERAL("general", "gen", 1);
+	/** Shareable general configuration; never local data or secrets. */
+	GENERAL("general", "gen", 1);
 
-        private final String id;
-        private final String prefix;
-        private final int currentVersion;
+	private final String id;
+	private final String prefix;
+	private final int currentVersion;
 
-        ShareType(String id, String prefix, int currentVersion) {
-                this.id = id;
-                this.prefix = prefix;
-                this.currentVersion = currentVersion;
-        }
+	ShareType(String id, String prefix, int currentVersion) {
+		this.id = id;
+		this.prefix = prefix;
+		this.currentVersion = currentVersion;
+	}
 
-        /** The {@code type} field of the share envelope. */
-        public String id() {
-                return id;
-        }
+	/** The {@code type} field of the share envelope. */
+	public String id() {
+		return id;
+	}
 
-        /** The short prefix players type in {@code /zea share <prefix>}. */
-        public String prefix() {
-                return prefix;
-        }
+	/** The short prefix players type in {@code /zea share <prefix>}. */
+	public String prefix() {
+		return prefix;
+	}
 
-        /** The payload schema version this build reads and writes. */
-        public int currentVersion() {
-                return currentVersion;
-        }
+	/** The payload schema version this build reads and writes. */
+	public int currentVersion() {
+		return currentVersion;
+	}
 
-        /**
-         * Looks a type up by envelope id or player prefix, case-insensitively.
-         *
-         * @throws ShareException naming the valid choices when nothing matches
-         */
-        public static ShareType from(String idOrPrefix) throws ShareException {
-                String wanted = idOrPrefix == null ? "" : idOrPrefix.strip().toLowerCase(java.util.Locale.ROOT);
-                for (ShareType type : values()) {
-                        if (type.id.equals(wanted) || type.prefix.equals(wanted)) {
-                                return type;
-                        }
-                }
-                throw new ShareException("Unknown share type '" + idOrPrefix + "'. Valid types: inven, gen");
-        }
+	/**
+	 * Looks a type up by envelope id or player prefix, case-insensitively.
+	 *
+	 * @throws ShareException naming the valid choices when nothing matches
+	 */
+	public static ShareType from(String idOrPrefix) throws ShareException {
+		String wanted = idOrPrefix == null ? "" : idOrPrefix.strip().toLowerCase(java.util.Locale.ROOT);
+		for (ShareType type : values()) {
+			if (type.id.equals(wanted) || type.prefix.equals(wanted)) {
+				return type;
+			}
+		}
+		throw new ShareException("Unknown share type '" + idOrPrefix + "'. Valid types: inven, gen");
+	}
 }

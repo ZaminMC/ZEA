@@ -40,90 +40,90 @@ import java.util.Set;
  * until nickname resolution is possible (see docs/EARTHMC_API.md).
  */
 public final class MentionDetector {
-        /** Categories where other players can talk about you. */
-        private static final Set<MessageCategory> CHAT_CATEGORIES = Set.of(
-                        MessageCategory.GLOBAL,
-                        MessageCategory.LOCAL,
-                        MessageCategory.TRADE,
-                        MessageCategory.NATION,
-                        MessageCategory.TOWN,
-                        MessageCategory.DISCORD,
-                        MessageCategory.UNCLASSIFIED);
+	/** Categories where other players can talk about you. */
+	private static final Set<MessageCategory> CHAT_CATEGORIES = Set.of(
+			MessageCategory.GLOBAL,
+			MessageCategory.LOCAL,
+			MessageCategory.TRADE,
+			MessageCategory.NATION,
+			MessageCategory.TOWN,
+			MessageCategory.DISCORD,
+			MessageCategory.UNCLASSIFIED);
 
-        /** Separator of the unstructured chat shape {@code Name: content}. */
-        private static final String SEPARATOR = ": ";
+	/** Separator of the unstructured chat shape {@code Name: content}. */
+	private static final String SEPARATOR = ": ";
 
-        /**
-         * Detects a mention of {@code localName} in a classified message.
-         */
-        public Optional<Mention> detect(ClassifiedMessage message, String localName) {
-                if (message == null || localName == null || localName.isBlank()
-                                || !CHAT_CATEGORIES.contains(message.category())) {
-                        return Optional.empty();
-                }
+	/**
+	 * Detects a mention of {@code localName} in a classified message.
+	 */
+	public Optional<Mention> detect(ClassifiedMessage message, String localName) {
+		if (message == null || localName == null || localName.isBlank()
+				|| !CHAT_CATEGORIES.contains(message.category())) {
+			return Optional.empty();
+		}
 
-                if (message.payload() instanceof ChannelChat chat) {
-                        return forChat(message, chat.displayName(), chat.content(), localName);
-                }
-                if (message.payload() instanceof TaggedChannelChat chat) {
-                        return forChat(message, chat.displayName(), chat.content(), localName);
-                }
-                return forUnstructured(message, message.captured().text(), localName);
-        }
+		if (message.payload() instanceof ChannelChat chat) {
+			return forChat(message, chat.displayName(), chat.content(), localName);
+		}
+		if (message.payload() instanceof TaggedChannelChat chat) {
+			return forChat(message, chat.displayName(), chat.content(), localName);
+		}
+		return forUnstructured(message, message.captured().text(), localName);
+	}
 
-        private Optional<Mention> forChat(ClassifiedMessage message, String speaker, String content, String localName) {
-                if (speaker.equalsIgnoreCase(localName)) {
-                        return Optional.empty();
-                }
-                return containsWord(content, localName)
-                                ? Optional.of(new Mention(message.captured(), speaker, content, message.category()))
-                                : Optional.empty();
-        }
+	private Optional<Mention> forChat(ClassifiedMessage message, String speaker, String content, String localName) {
+		if (speaker.equalsIgnoreCase(localName)) {
+			return Optional.empty();
+		}
+		return containsWord(content, localName)
+				? Optional.of(new Mention(message.captured(), speaker, content, message.category()))
+				: Optional.empty();
+	}
 
-        private Optional<Mention> forUnstructured(ClassifiedMessage message, String text, String localName) {
-                int separator = text.indexOf(SEPARATOR);
-                if (separator <= 0) {
-                        return Optional.empty();
-                }
-                String speaker = lastWord(text.substring(0, separator));
-                if (speaker.isBlank() || speaker.equalsIgnoreCase(localName)) {
-                        return Optional.empty();
-                }
-                String content = text.substring(separator + SEPARATOR.length());
-                return containsWord(content, localName)
-                                ? Optional.of(new Mention(message.captured(), speaker, content, message.category()))
-                                : Optional.empty();
-        }
+	private Optional<Mention> forUnstructured(ClassifiedMessage message, String text, String localName) {
+		int separator = text.indexOf(SEPARATOR);
+		if (separator <= 0) {
+			return Optional.empty();
+		}
+		String speaker = lastWord(text.substring(0, separator));
+		if (speaker.isBlank() || speaker.equalsIgnoreCase(localName)) {
+			return Optional.empty();
+		}
+		String content = text.substring(separator + SEPARATOR.length());
+		return containsWord(content, localName)
+				? Optional.of(new Mention(message.captured(), speaker, content, message.category()))
+				: Optional.empty();
+	}
 
-        /** Case-insensitive word-boundary match; the name charset is [A-Za-z0-9_]. */
-        static boolean containsWord(String text, String name) {
-                String haystack = text.toLowerCase(Locale.ROOT);
-                String needle = name.toLowerCase(Locale.ROOT);
-                int from = 0;
-                int at;
-                while ((at = haystack.indexOf(needle, from)) >= 0) {
-                        int end = at + needle.length();
-                        boolean leftOk = at == 0 || !isNameChar(text.charAt(at - 1));
-                        boolean rightOk = end >= text.length() || !isNameChar(text.charAt(end));
-                        if (leftOk && rightOk) {
-                                return true;
-                        }
-                        from = at + 1;
-                }
-                return false;
-        }
+	/** Case-insensitive word-boundary match; the name charset is [A-Za-z0-9_]. */
+	static boolean containsWord(String text, String name) {
+		String haystack = text.toLowerCase(Locale.ROOT);
+		String needle = name.toLowerCase(Locale.ROOT);
+		int from = 0;
+		int at;
+		while ((at = haystack.indexOf(needle, from)) >= 0) {
+			int end = at + needle.length();
+			boolean leftOk = at == 0 || !isNameChar(text.charAt(at - 1));
+			boolean rightOk = end >= text.length() || !isNameChar(text.charAt(end));
+			if (leftOk && rightOk) {
+				return true;
+			}
+			from = at + 1;
+		}
+		return false;
+	}
 
-        private static boolean isNameChar(char c) {
-                return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                                || (c >= '0' && c <= '9') || c == '_';
-        }
+	private static boolean isNameChar(char c) {
+		return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+				|| (c >= '0' && c <= '9') || c == '_';
+	}
 
-        private static String lastWord(String head) {
-                String trimmed = head.stripTrailing();
-                int start = trimmed.length();
-                while (start > 0 && isNameChar(trimmed.charAt(start - 1))) {
-                        start--;
-                }
-                return trimmed.substring(start);
-        }
+	private static String lastWord(String head) {
+		String trimmed = head.stripTrailing();
+		int start = trimmed.length();
+		while (start > 0 && isNameChar(trimmed.charAt(start - 1))) {
+			start--;
+		}
+		return trimmed.substring(start);
+	}
 }

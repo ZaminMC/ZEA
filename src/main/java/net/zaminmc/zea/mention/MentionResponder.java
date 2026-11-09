@@ -6,9 +6,9 @@ package net.zaminmc.zea.mention;
  * testable and the none-implementation is trivial.
  */
 public interface MentionResponder {
-        /** A mention-eligible no-op; the default until responses are enabled. */
-        MentionResponder NONE = (mention, now) -> {
-        };
+	/** A mention-eligible no-op; the default until responses are enabled. */
+	MentionResponder NONE = (mention, now) -> {
+	};
 
-        void onMention(Mention mention, long now);
+	void onMention(Mention mention, long now);
 }

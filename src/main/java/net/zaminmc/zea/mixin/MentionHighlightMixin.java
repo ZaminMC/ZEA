@@ -30,28 +30,28 @@ import org.spongepowered.asm.mixin.injection.At;
  */
 @Mixin(ChatComponent.class)
 public abstract class MentionHighlightMixin {
-        /** Gold tint over the black line background; alpha is the line's own. */
-        private static final int MENTION_TINT = 0xFFAA00;
-        private static final float MENTION_OPACITY = 0.30F;
+	/** Gold tint over the black line background; alpha is the line's own. */
+	private static final int MENTION_TINT = 0xFFAA00;
+	private static final float MENTION_OPACITY = 0.30F;
 
-        @WrapOperation(method = "lambda$extractRenderState$1",
-                        at = @At(value = "INVOKE",
-                                        target = "Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;fill(IIIII)V"))
-        private static void zea$tintMentionedLine(int chatBottom, int entryHeight,
-                        ChatComponent.ChatGraphicsAccess graphics, int maxWidth, float backgroundOpacity,
-                        GuiMessage.Line line, int lineIndex, float alpha,
-                        int x0, int y0, int x1, int y1, int color,
-                        Operation<Void> original) {
-                original.call(x0, y0, x1, y1, color);
-                if (zea$highlightingActive()
-                                && ZeaClient.chat().mentions().highlight().isHighlighted(line.parent().content())) {
-                        graphics.fill(x0, y0, x1, y1, ARGB.color(alpha * MENTION_OPACITY, MENTION_TINT));
-                }
-        }
+	@WrapOperation(method = "lambda$extractRenderState$1",
+			at = @At(value = "INVOKE",
+					target = "Lnet/minecraft/client/gui/components/ChatComponent$ChatGraphicsAccess;fill(IIIII)V"))
+	private static void zea$tintMentionedLine(int chatBottom, int entryHeight,
+			ChatComponent.ChatGraphicsAccess graphics, int maxWidth, float backgroundOpacity,
+			GuiMessage.Line line, int lineIndex, float alpha,
+			int x0, int y0, int x1, int y1, int color,
+			Operation<Void> original) {
+		original.call(x0, y0, x1, y1, color);
+		if (zea$highlightingActive()
+				&& ZeaClient.chat().mentions().highlight().isHighlighted(line.parent().content())) {
+			graphics.fill(x0, y0, x1, y1, ARGB.color(alpha * MENTION_OPACITY, MENTION_TINT));
+		}
+	}
 
-        private static boolean zea$highlightingActive() {
-                return ZeaClient.chat() != null
-                                && ZeaClient.lifecycle().onEarthMc()
-                                && ZeaClient.config().mentionHighlightEnabled();
-        }
+	private static boolean zea$highlightingActive() {
+		return ZeaClient.chat() != null
+				&& ZeaClient.lifecycle().onEarthMc()
+				&& ZeaClient.config().mentionHighlightEnabled();
+	}
 }

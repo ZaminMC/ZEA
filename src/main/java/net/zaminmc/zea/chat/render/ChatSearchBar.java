@@ -13,22 +13,22 @@ import net.minecraft.network.chat.Component;
  * fixes the height to the chat widget grid.
  */
 public final class ChatSearchBar extends EditBox {
-        /** Height of the search row; the chat screen positions the bar with it. */
-        public static final int SEARCH_HEIGHT = 12;
-        private static final int BACKGROUND = 0x66000000;
+	/** Height of the search row; the chat screen positions the bar with it. */
+	public static final int SEARCH_HEIGHT = 12;
+	private static final int BACKGROUND = 0x66000000;
 
-        public ChatSearchBar(Font font, int x, int y, int width) {
-                super(font, x, y, width, SEARCH_HEIGHT, Component.translatable("zea.chat.search"));
-                setBordered(false);
-                setHeight(SEARCH_HEIGHT);
-        }
+	public ChatSearchBar(Font font, int x, int y, int width) {
+		super(font, x, y, width, SEARCH_HEIGHT, Component.translatable("zea.chat.search"));
+		setBordered(false);
+		setHeight(SEARCH_HEIGHT);
+	}
 
-        @Override
-        public void extractWidgetRenderState(GuiGraphicsExtractor extractor, int mouseX, int mouseY,
-                        float partialTick) {
-                if (visible) {
-                        extractor.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), BACKGROUND);
-                }
-                super.extractWidgetRenderState(extractor, mouseX, mouseY, partialTick);
-        }
+	@Override
+	public void extractWidgetRenderState(GuiGraphicsExtractor extractor, int mouseX, int mouseY,
+			float partialTick) {
+		if (visible) {
+			extractor.fill(getX(), getY(), getX() + getWidth(), getY() + getHeight(), BACKGROUND);
+		}
+		super.extractWidgetRenderState(extractor, mouseX, mouseY, partialTick);
+	}
 }

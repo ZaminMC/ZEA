@@ -14,29 +14,29 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class InventoryButtonsTest {
-        @TempDir
-        Path tempDir;
+	@TempDir
+	Path tempDir;
 
-        private final List<String> sent = new ArrayList<>();
+	private final List<String> sent = new ArrayList<>();
 
-        private ButtonActivator activator() {
-                return new ButtonActivator(sent::add, 0);
-        }
+	private ButtonActivator activator() {
+		return new ButtonActivator(sent::add, 0);
+	}
 
-        private static final int LEFT = 40;
-        private static final int TOP = 20;
-        private static final int WIDTH = 176;
-        private static final int HEIGHT = 166;
+	private static final int LEFT = 40;
+	private static final int TOP = 20;
+	private static final int WIDTH = 176;
+	private static final int HEIGHT = 166;
 
-        private InventoryButtons loadedWith(String json) throws IOException {
-                Path file = tempDir.resolve("buttons.json");
-                Files.writeString(file, json, UTF_8);
-                return new InventoryButtons(file, activator());
-        }
+	private InventoryButtons loadedWith(String json) throws IOException {
+		Path file = tempDir.resolve("buttons.json");
+		Files.writeString(file, json, UTF_8);
+		return new InventoryButtons(file, activator());
+	}
 
-        @Test
-        void loadsButtonsFromTheStore() throws IOException {
-                InventoryButtons buttons = loadedWith("""
+	@Test
+	void loadsButtonsFromTheStore() throws IOException {
+		InventoryButtons buttons = loadedWith("""
                                 {
                                   "version": 1,
                                   "buttons": [
@@ -45,20 +45,20 @@ class InventoryButtonsTest {
                                 }
                                 """);
 
-                assertEquals(1, buttons.buttons().size());
-                assertEquals("Home", buttons.buttons().get(0).name());
-        }
+		assertEquals(1, buttons.buttons().size());
+		assertEquals("Home", buttons.buttons().get(0).name());
+	}
 
-        @Test
-        void missingFileYieldsNoButtons() {
-                InventoryButtons buttons = new InventoryButtons(tempDir.resolve("absent.json"), activator());
+	@Test
+	void missingFileYieldsNoButtons() {
+		InventoryButtons buttons = new InventoryButtons(tempDir.resolve("absent.json"), activator());
 
-                assertEquals(List.of(), buttons.buttons());
-        }
+		assertEquals(List.of(), buttons.buttons());
+	}
 
-        @Test
-        void buttonAtFindsEnabledButtonsOnly() throws IOException {
-                InventoryButtons buttons = loadedWith("""
+	@Test
+	void buttonAtFindsEnabledButtonsOnly() throws IOException {
+		InventoryButtons buttons = loadedWith("""
                                 {
                                   "version": 1,
                                   "buttons": [
@@ -67,22 +67,22 @@ class InventoryButtonsTest {
                                   ]
                                 }
                                 """);
-                InventoryButton home = buttons.buttons().get(0);
-                InventoryButton hidden = buttons.buttons().get(1);
-                int homeX = ButtonGeometry.x(home, LEFT, WIDTH);
-                int homeY = ButtonGeometry.y(home, TOP, HEIGHT);
-                int hiddenX = ButtonGeometry.x(hidden, LEFT, WIDTH);
-                int hiddenY = ButtonGeometry.y(hidden, TOP, HEIGHT);
+		InventoryButton home = buttons.buttons().get(0);
+		InventoryButton hidden = buttons.buttons().get(1);
+		int homeX = ButtonGeometry.x(home, LEFT, WIDTH);
+		int homeY = ButtonGeometry.y(home, TOP, HEIGHT);
+		int hiddenX = ButtonGeometry.x(hidden, LEFT, WIDTH);
+		int hiddenY = ButtonGeometry.y(hidden, TOP, HEIGHT);
 
-                assertEquals(home, buttons.buttonAt(LEFT, TOP, WIDTH, HEIGHT, homeX + 1, homeY + 1));
-                assertNull(buttons.buttonAt(LEFT, TOP, WIDTH, HEIGHT, hiddenX + 1, hiddenY + 1),
-                                "disabled buttons are not hit");
-                assertNull(buttons.buttonAt(LEFT, TOP, WIDTH, HEIGHT, 0, 0));
-        }
+		assertEquals(home, buttons.buttonAt(LEFT, TOP, WIDTH, HEIGHT, homeX + 1, homeY + 1));
+		assertNull(buttons.buttonAt(LEFT, TOP, WIDTH, HEIGHT, hiddenX + 1, hiddenY + 1),
+				"disabled buttons are not hit");
+		assertNull(buttons.buttonAt(LEFT, TOP, WIDTH, HEIGHT, 0, 0));
+	}
 
-        @Test
-        void overlappingButtonsResolveToTheLastDrawn() throws IOException {
-                InventoryButtons buttons = loadedWith("""
+	@Test
+	void overlappingButtonsResolveToTheLastDrawn() throws IOException {
+		InventoryButtons buttons = loadedWith("""
                                 {
                                   "version": 1,
                                   "buttons": [
@@ -92,14 +92,14 @@ class InventoryButtonsTest {
                                 }
                                 """);
 
-                InventoryButton hit = buttons.buttonAt(LEFT, TOP, WIDTH, HEIGHT, LEFT + 5, TOP + 5);
+		InventoryButton hit = buttons.buttonAt(LEFT, TOP, WIDTH, HEIGHT, LEFT + 5, TOP + 5);
 
-                assertEquals("Over", hit.name(), "the button drawn on top must win the hit test");
-        }
+		assertEquals("Over", hit.name(), "the button drawn on top must win the hit test");
+	}
 
-        @Test
-        void clickRunsTheButtonThroughTheActivator() throws IOException {
-                InventoryButtons buttons = loadedWith("""
+	@Test
+	void clickRunsTheButtonThroughTheActivator() throws IOException {
+		InventoryButtons buttons = loadedWith("""
                                 {
                                   "version": 1,
                                   "buttons": [
@@ -107,10 +107,10 @@ class InventoryButtonsTest {
                                   ]
                                 }
                                 """);
-                InventoryButton home = buttons.buttons().get(0);
+		InventoryButton home = buttons.buttons().get(0);
 
-                assertEquals(ButtonActivator.Result.EXECUTED, buttons.click(home, 1_000));
+		assertEquals(ButtonActivator.Result.EXECUTED, buttons.click(home, 1_000));
 
-                assertEquals(List.of("town spawn"), sent);
-        }
+		assertEquals(List.of("town spawn"), sent);
+	}
 }

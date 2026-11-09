@@ -20,18 +20,18 @@ import org.spongepowered.asm.mixin.Shadow;
  */
 @Mixin(Screen.class)
 public abstract class ScreenMixin implements ScreenWidgetAccess {
-        /**
-         * The erased view of vanilla's
-         * {@code <T extends GuiEventListener & Renderable & NarratableEntry>
-         * T addRenderableWidget(T)}: shadows match on name and erased
-         * descriptor, and the erased form keeps the bridge call free of
-         * type-variable inference.
-         */
-        @Shadow
-        protected abstract GuiEventListener addRenderableWidget(GuiEventListener widget);
+	/**
+	 * The erased view of vanilla's
+	 * {@code <T extends GuiEventListener & Renderable & NarratableEntry>
+	 * T addRenderableWidget(T)}: shadows match on name and erased
+	 * descriptor, and the erased form keeps the bridge call free of
+	 * type-variable inference.
+	 */
+	@Shadow
+	protected abstract GuiEventListener addRenderableWidget(GuiEventListener widget);
 
-        @Override
-        public GuiEventListener zea$addRenderableWidget(GuiEventListener widget) {
-                return addRenderableWidget(widget);
-        }
+	@Override
+	public GuiEventListener zea$addRenderableWidget(GuiEventListener widget) {
+		return addRenderableWidget(widget);
+	}
 }

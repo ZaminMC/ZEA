@@ -6,9 +6,9 @@ package net.zaminmc.zea.notify;
  */
 @FunctionalInterface
 public interface NotificationSound {
-        /** A sound that does nothing — for tests and muted setups. */
-        NotificationSound NONE = kind -> {
-        };
+	/** A sound that does nothing — for tests and muted setups. */
+	NotificationSound NONE = kind -> {
+	};
 
-        void play(NotificationKind kind);
+	void play(NotificationKind kind);
 }

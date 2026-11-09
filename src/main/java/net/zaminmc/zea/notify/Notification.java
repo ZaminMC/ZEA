@@ -28,57 +28,57 @@ import net.minecraft.network.chat.Component;
  *                       (e.g. the PM sender's name); {@code null} otherwise
  */
 public record Notification(NotificationKind kind, Component text, Destination destination,
-                long durationMillis, long expiryMillis, String key) {
+		long durationMillis, long expiryMillis, String key) {
 
-        /** Where the notification is displayed. */
-        public enum Destination {
-                ACTION_BAR("Action bar"),
-                TITLE("Title");
+	/** Where the notification is displayed. */
+	public enum Destination {
+		ACTION_BAR("Action bar"),
+		TITLE("Title");
 
-                private final String label;
+		private final String label;
 
-                Destination(String label) {
-                        this.label = label;
-                }
+		Destination(String label) {
+			this.label = label;
+		}
 
-                /** What the MoulConfig dropdown shows for this choice. */
-                @Override
-                public String toString() {
-                        return label;
-                }
-        }
+		/** What the MoulConfig dropdown shows for this choice. */
+		@Override
+		public String toString() {
+			return label;
+		}
+	}
 
-        public Notification {
-                if (kind == null || text == null || destination == null) {
-                        throw new NullPointerException("notification fields must not be null");
-                }
-                if (durationMillis < 0 || expiryMillis < 0) {
-                        throw new IllegalArgumentException("notification durations must not be negative");
-                }
-                if (durationMillis > 0 && expiryMillis > 0) {
-                        throw new IllegalArgumentException("a notification is temporary or persistent, not both");
-                }
-                if (durationMillis == 0 && expiryMillis == 0) {
-                        throw new IllegalArgumentException("a notification must have a lifetime");
-                }
-                if (expiryMillis > 0 && key == null) {
-                        throw new IllegalArgumentException("a persistent notification needs a resolution key");
-                }
-        }
+	public Notification {
+		if (kind == null || text == null || destination == null) {
+			throw new NullPointerException("notification fields must not be null");
+		}
+		if (durationMillis < 0 || expiryMillis < 0) {
+			throw new IllegalArgumentException("notification durations must not be negative");
+		}
+		if (durationMillis > 0 && expiryMillis > 0) {
+			throw new IllegalArgumentException("a notification is temporary or persistent, not both");
+		}
+		if (durationMillis == 0 && expiryMillis == 0) {
+			throw new IllegalArgumentException("a notification must have a lifetime");
+		}
+		if (expiryMillis > 0 && key == null) {
+			throw new IllegalArgumentException("a persistent notification needs a resolution key");
+		}
+	}
 
-        /** A notification that shows for the given duration and then expires. */
-        public static Notification temporary(NotificationKind kind, Component text, Destination destination,
-                        long durationMillis) {
-                return new Notification(kind, text, destination, durationMillis, 0, null);
-        }
+	/** A notification that shows for the given duration and then expires. */
+	public static Notification temporary(NotificationKind kind, Component text, Destination destination,
+			long durationMillis) {
+		return new Notification(kind, text, destination, durationMillis, 0, null);
+	}
 
-        /** A notification that shows until resolved by key or after the hard expiry. */
-        public static Notification persistent(NotificationKind kind, Component text, Destination destination,
-                        long expiryMillis, String key) {
-                return new Notification(kind, text, destination, 0, expiryMillis, key);
-        }
+	/** A notification that shows until resolved by key or after the hard expiry. */
+	public static Notification persistent(NotificationKind kind, Component text, Destination destination,
+			long expiryMillis, String key) {
+		return new Notification(kind, text, destination, 0, expiryMillis, key);
+	}
 
-        public boolean isPersistent() {
-                return expiryMillis > 0;
-        }
+	public boolean isPersistent() {
+		return expiryMillis > 0;
+	}
 }

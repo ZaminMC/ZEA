@@ -6,11 +6,11 @@ package net.zaminmc.zea.share;
  * for the player, not the log — commands show it verbatim.
  */
 public final class ShareException extends Exception {
-        public ShareException(String message) {
-                super(message);
-        }
+	public ShareException(String message) {
+		super(message);
+	}
 
-        public ShareException(String message, Throwable cause) {
-                super(message, cause);
-        }
+	public ShareException(String message, Throwable cause) {
+		super(message, cause);
+	}
 }

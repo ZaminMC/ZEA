@@ -15,12 +15,12 @@ import net.minecraft.client.gui.components.events.GuiEventListener;
  * registration semantics the current version has.
  */
 public interface ScreenWidgetAccess {
-        /**
-         * Registers a widget with the screen — renderable, event listener and
-         * narratable — exactly like {@code Screen#addRenderableWidget}.
-         *
-         * @param widget the widget to add
-         * @return the widget, typed as its listener view
-         */
-        GuiEventListener zea$addRenderableWidget(GuiEventListener widget);
+	/**
+	 * Registers a widget with the screen — renderable, event listener and
+	 * narratable — exactly like {@code Screen#addRenderableWidget}.
+	 *
+	 * @param widget the widget to add
+	 * @return the widget, typed as its listener view
+	 */
+	GuiEventListener zea$addRenderableWidget(GuiEventListener widget);
 }
