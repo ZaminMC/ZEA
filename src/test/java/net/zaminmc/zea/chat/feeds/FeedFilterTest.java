@@ -121,6 +121,44 @@ class FeedFilterTest {
 		assertNull(filter.currentFilter());
 	}
 
+	/**
+	 * Vanilla's chat requires a non-null visibleMessageFilter — the field
+	 * starts always-true and addMessage tests it without a null check, so a
+	 * null install throws on the next incoming message and drops the
+	 * connection. The All tab (also: the disconnect reset) must therefore
+	 * install "show everything", not null.
+	 */
+	@Test
+	void allTabInstallsNonNullAlwaysTrueFilter() {
+		Predicate<GuiMessage> installed = filter.installableFilter();
+
+		assertNotNull(installed);
+		assertTrue(installed.test(message("[Germany|Berlin] KoenigLuis: hello")));
+		assertTrue(installed.test(message("completely unknown structure")));
+	}
+
+	@Test
+	void blankSearchOnAllInstallsNonNullAlwaysTrueFilter() {
+		filter.setSearchQuery("");
+
+		Predicate<GuiMessage> installed = filter.installableFilter();
+
+		assertNotNull(installed);
+		assertTrue(installed.test(message("[Germany|Berlin] KoenigLuis: hello")));
+	}
+
+	@Test
+	void installableFilterTracksSearchAndFeedWhenTheyFilter() {
+		filter.setSearchQuery("gravel");
+		selection.select(Feeds.GLOBAL);
+
+		Predicate<GuiMessage> installed = filter.installableFilter();
+
+		assertNotNull(installed);
+		assertFalse(installed.test(message("[Germany|Berlin] KoenigLuis: selling dirt cheap")));
+		assertTrue(installed.test(message("[Germany|Berlin] KoenigLuis: selling gravel cheap")));
+	}
+
 	@Test
 	void selectedFeedShowsOnlyItsMessages() {
 		selection.select(Feeds.VOTES);

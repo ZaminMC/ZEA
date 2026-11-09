@@ -18,12 +18,22 @@ import java.util.function.Predicate;
  * restores messages ZEA never classified (shown by vanilla as usual); a
  * search, however, filters even on All.
  *
+ * <p>Vanilla requires the installed filter to be non-null: the field
+ * starts as an always-true predicate and neither {@code addMessage} nor
+ * the setter's internal refresh null-checks it (verified against the 26.3
+ * bytecode), so installing null makes the next incoming message throw and
+ * drop the connection. {@link #installableFilter()} therefore maps
+ * "nothing filters" to an always-true predicate instead of null.
+ *
  * <p>The search query is held here — not in the chat screen — so it is
  * the single source of truth that survives screen rebuilds (window
  * resize) and can be reset on disconnect. {@code null} means the search
  * is closed; an empty string means open but not narrowing anything yet.
  */
 public final class FeedFilter {
+	/** What vanilla itself installs when nothing should be hidden. */
+	private static final Predicate<GuiMessage> SHOW_EVERYTHING = message -> true;
+
 	private final ClassificationCache cache;
 	private final FeedSelection selection;
 	private String searchQuery;
@@ -64,9 +74,20 @@ public final class FeedFilter {
 		return byFeed.and(bySearch);
 	}
 
+	/**
+	 * The predicate {@link #apply(ChatComponent)} installs — like
+	 * {@link #currentFilter()}, except "nothing filters" becomes an
+	 * always-true predicate instead of {@code null}, because vanilla's
+	 * chat crashes on a null filter when the next message arrives.
+	 */
+	public Predicate<GuiMessage> installableFilter() {
+		Predicate<GuiMessage> filter = currentFilter();
+		return filter != null ? filter : SHOW_EVERYTHING;
+	}
+
 	/** Installs (or clears) the filter on the live chat component. */
 	public void apply(ChatComponent chat) {
-		chat.setVisibleMessageFilter(currentFilter());
+		chat.setVisibleMessageFilter(installableFilter());
 	}
 
 	private Predicate<GuiMessage> feedPredicate() {
