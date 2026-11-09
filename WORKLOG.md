@@ -1656,3 +1656,177 @@ screen).
   caller, it and ZEA will overwrite each other's filter on their own
   triggers — pre-existing interplay, unchanged by this fix, but worth
   remembering if tab filtering ever looks wrong after a config save.
+
+## 2026-11-10 (session 2) — The first live tab test: null cache, the ingest gate, and the rebuild glitches
+
+### What happened
+
+The player's first live test of the tab system on dev.23 (the tab UI
+itself had never been exercised in-game before — every prior release
+note said "pending the next session"):
+
+1. Chat tabs appear correctly on join.
+2. Switching tabs causes visual glitches.
+3. Switching tabs can disconnect the player ("Network Protocol
+   Error").
+4. The chat filtering system does not work as intended.
+
+Two stack traces from the live log:
+
+- Click path: `ChatTabBar.onClick` → the ChatScreenMixin select
+  lambda → `FeedFilter.apply` → `ChatComponent.setVisibleMessageFilter`
+  → `refreshTrimmedMessages` → `FeedFilter.lambda$feedPredicate$0:98` →
+  NPE: `this.cache` is null in the feed predicate.
+- Packet path: `ClientPacketListener.handleSystemChat:1057` →
+  `ChatListener.handleSystemMessage:242` → `addServerSystemMessage:284`
+  → `ChatComponent.addMessage:295` → the same NPE — the disconnect.
+
+### Root cause
+
+Three defects, one shared trigger, each proven against the mapped 26.3
+bytecode before any change was made.
+
+**The null cache** — a construction-order bug, present since the
+feed-filtering commit, deterministic on every launch:
+
+- `ChatSubsystem` declared
+  `private final FeedFilter feedFilter = new FeedFilter(classifications(), feedSelection);`
+  as a *field initializer*, while `classifications` was assigned only
+  in the *constructor body*. Java runs field initializers before the
+  constructor body, so `classifications()` returned null, and the
+  singleton `FeedFilter` was built with a null cache — permanently, not
+  as a race or a reload artifact (init is single-threaded; the field is
+  final; nothing recreates it).
+- The crash mechanics, from the bytecode: the predicate *lambda* merely
+  captures the null `cache`; nothing dereferences it until vanilla
+  tests the filter. `setVisibleMessageFilter` assigns the field *then*
+  calls `refreshTrimmedMessages` (line 105 → 106), so the broken
+  predicate is already installed when the first test throws.
+- Not another mod: no line of the stack leaves ZEA, and only ZEA
+  constructs this filter. The 239-mod pack (OneConfig, MoreChatHistory,
+  Chatting) is not in the path.
+
+**The ingest gate** — the architecture rested on a false assumption
+about vanilla semantics:
+
+- `FeedFilter`'s contract said "filtering is visual only — every
+  message stays in the chat history, so switching back to All shows
+  them again." Vanilla 26.3's `addMessage` makes that impossible as
+  written: it tests the filter at line 295 and *returns* on reject at
+  line 300 — before `logChatMessage`, before
+  `addMessageToDisplayQueue` (the display list), and crucially before
+  `addMessageToQueue` (the `allMessages` history). A rejected message
+  is not hidden; it is *destroyed*.
+- Consequence with a *working* cache: every message arriving while a
+  channel tab (or a search) is active would be dropped from the chat
+  forever — switching back to All could not restore what was never
+  stored. This is live report #4, independent of the crash.
+
+**The rebuild glitches** — two separate mechanisms, both verified:
+
+- `refreshTrimmedMessages` clears `trimmedMessages` (line 389) *then*
+  tests each stored message (line 391). With the null cache the first
+  test throws, so the click left the visible chat **empty** — the
+  "visual glitch" — while the broken predicate stayed installed for
+  the next packet to trip over (the disconnect).
+- Even with the NPE fixed, two vanilla behaviors made tab switching
+  visually wrong, because a bulk rebuild is not an append:
+  `addMessageToDisplayQueue` compensates the scroll anchor one notch
+  *per line* while the chat is open and scrolled up — across a whole
+  rebuild the anchor inflates until it clamps against the new
+  (shorter) list, jumping the view toward the oldest messages; and the
+  smooth-chat hooks (`zea$animateNewMessage`, `zea$animateScroll`)
+  treated every rebuilt message as *new*, so the chat would glide on
+  every tab switch (smooth chat is on by default).
+
+### Fix
+
+Lifecycle ownership, not null checks:
+
+- `ChatSubsystem` — the filter is constructed in the constructor body,
+  after the cache exists. `FeedFilter` — the constructor now fails fast
+  on a null cache or selection (`Objects.requireNonNull`), so a future
+  wiring mistake dies at startup, where it is debuggable, instead of
+  inside a packet handler. The fail-fast follows the same convention as
+  `ClassificationCache`'s own constructor.
+- `FeedFilter.Installed` (new, nested) — everything ZEA installs as
+  the vanilla filter is now a delegating wrapper recognizably ZEA's
+  own. Behavior is unchanged; the marker exists so the retention wrap
+  can distinguish ZEA's filters from vanilla's chat-trust filter and
+  other mods'.
+- `ChatComponentMixin` — three additions:
+  - A `@WrapOperation` on the `Predicate.test` call inside `addMessage`:
+    when the installed filter is ZEA's and rejects a message, the
+    handler stores it through the shadowed `addMessageToQueue` before
+    vanilla drops it — hidden from the display list now, retained in
+    `allMessages` for every other feed and the All aggregate. Any other
+    filter is a pure passthrough (vanilla and other mods keep their
+    drop semantics byte-for-byte). This restores the documented tab
+    contract — and equally fixes search, which had the same latent
+    data loss.
+  - A `refreshTrimmedMessages` bracket: remember the scroll anchor at
+    HEAD; at TAIL restore it and re-clamp through vanilla's own
+    `scrollChat(0)` (which also clears `newMessageSinceScroll` when it
+    clamps to zero). EarthMC-gated: off EarthMC, vanilla's own rare
+    filter toggles keep their behavior untouched.
+  - A `zea$inRefresh` flag guarding the smooth-chat hooks, so a
+    rebuilt message never counts as new or as scrolling. The flag is
+    also cleared by `resetChatScroll` (which never runs inside a
+    rebuild) so a third-party filter that throws mid-rebuild can only
+    disable animations until the next successful refresh or screen
+    close — never correctness.
+
+### Tests performed
+
+- `./gradlew build` green; **522 tests, 0 failures** (was 518).
+- `ChatSubsystemWiringTest` (new) — reads the *compiled* constructor
+  with ASM (ChatSubsystem cannot be constructed in a test JVM: it
+  registers Fabric events and binds Minecraft) and pins that no read of
+  the classification cache — direct or through the accessor — precedes
+  its assignment. Counterfactual, run manually during development:
+  restoring the dev.23 field initializer makes this test fail with
+  exactly the diagnosis above. The bug class is now a build failure,
+  not a live disconnect.
+- `FeedFilterTest` — three new tests: the constructor rejects null
+  cache and null selection; every filter state (All, blank search,
+  feed selected, feed+search) installs an `Installed` predicate; the
+  wrapper delegates to the composed filter (feed+search semantics
+  through `installableFilter()`).
+- `WrapOperationSignatureTest` — automatically picked up the new
+  retention handler and validated its signature against the mapped jar;
+  it caught a malformed `@At` target during development (a stray colon
+  in the member spec — field syntax in a method target) before it
+  could reach a game. The existing tests kept their coverage of the
+  two older wraps.
+- `MixinSurfaceTest` — pins the newly targeted members
+  (`addMessage`, `addMessageToQueue`, `refreshTrimmedMessages`,
+  `newMessageSinceScroll`) as declared by `ChatComponent` in 26.3, per
+  the file's own rule that mixin changes pin their targets in the same
+  commit.
+- Threading, verified from the bytecode rather than assumed:
+  `handleSystemChat` opens with `PacketUtils.ensureRunningOnSameThread`,
+  so the entire path — Fabric capture event, classification, `addMessage`,
+  the retention wrap, the refresh — runs on the game thread. The
+  cache's unsynchronized `IdentityHashMap` is safe by confinement, as
+  its javadoc claims.
+
+### Outstanding problems
+
+- Live verification pending the player's next session — dev.24
+  carries everything. The sequences to test: repeated tab switching
+  (both while at the bottom and scrolled up), switching to a channel
+  tab, letting messages arrive, then switching back to All (they must
+  all be there), search open/narrow/close on each tab, and the dev.23
+  rejoin sequence.
+- `allMessages` still holds only vanilla's 100-entry window (or
+  whatever MoreChatHistory raises it to); retention keeps messages
+  *within* that window, and ZEA's own persistent history remains the
+  only full record.
+- Vanilla's `logChatMessage` is skipped for retained messages (they
+  never hit the client's `[CHAT]` log line) — the same as any
+  filter-rejected message, and they remain in ZEA's history store.
+- The pre-existing interplay note from the dev.23 entry (another
+  `setVisibleMessageFilter` caller overwriting ZEA's filter) still
+  stands, and now cuts both ways: a foreign filter that replaces ZEA's
+  stops retention until ZEA re-applies, because the wrap only retains
+  for `Installed` predicates.

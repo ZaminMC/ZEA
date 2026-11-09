@@ -65,7 +65,10 @@ appearance, player hover presentation, real-username display option.
 
 Done: chat tab bar (EarthMC-only, flat design), feed filtering through
 the official `setVisibleMessageFilter` hook (identity-keyed
-classification cache), message copying (right-click plain,
+classification cache; hidden messages are retained into the chat
+history through a narrow wrap on vanilla's ingest gate, so switching
+tabs and searches are lossless and reversible), message copying
+(right-click plain,
 alt+right-click formatted, legacy serializer, confirmation toast),
 chat search (Ctrl+F, composes with the selected feed, survives resize,
 clears on close/disconnect), smooth chat (quartic ease-out for new
