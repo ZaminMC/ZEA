@@ -1541,3 +1541,118 @@ scale).
 - In-game verification of the whole chat surface (tabs, search, copy,
   multi-send, mention tint) still pending the player's next session —
   dev.21 carries this and the paste hostname fix.
+
+## 2026-11-10 — The rejoin disconnect, the import ambiguity, and the /zea menu
+
+### What happened
+
+Three live reports from the player on dev.19+:
+
+1. Joining EarthMC disconnects immediately with "Network Protocol
+   Error". Log signature: `Connected to EarthMC; EarthMC features
+   enabled`, then while handling the first `ClientboundSystemChatPacket`
+   — `Cannot invoke "java.util.function.Predicate.test(Object)"
+   because "this.visibleMessageFilter" is null` at
+   `ChatComponent.addMessage:295`.
+2. Brigadier warnings on every registration:
+   `Ambiguity: [zea, import, confirm] vs [zea, import, paste]` (and the
+   same for `cancel`).
+3. `/zea` "does not open maulconfig menu at all" — reported twice.
+
+All three were investigated to a proven cause before any change.
+
+### Root cause
+
+**The rejoin disconnect** — a ZEA defect since the feed-filtering
+commit (dev.1), bytecode-verified against the mapped 26.3 jar:
+
+- Vanilla initializes `visibleMessageFilter` in the `ChatComponent`
+  constructor to a non-null always-true lambda; its only other setter
+  caller (`LocalPlayer`, fed by `ChatAbilities`) also passes non-null.
+  The field is never null in vanilla — and `addMessage` (and the
+  setter's internal `refreshTrimmedMessages`) call `.test` on it with
+  no null check.
+- `FeedFilter.apply()` passed `currentFilter()` straight through, and
+  that is null whenever nothing filters (All tab, no search).
+- The silent detonation path: at disconnect, vanilla's
+  `Hud.onDisconnected()` clears the message list *before* ZEA's
+  disconnect reset installs the null, so the refresh loop (which would
+  otherwise NPE immediately) iterates nothing — the null lands quietly.
+  The `ChatComponent` lives on the `Gui`'s hud, which is created once
+  per client launch and survives server switches, so the null persists
+  into the next session; EarthMC's first welcome message then throws
+  inside the packet handler and the connection drops. Mid-session the
+  same defect could fire by clicking the All tab or closing a search
+  with messages on screen — NPE inside the click handler.
+- Not another mod, not MC: only an explicit
+  `setVisibleMessageFilter(null)` can produce the state, and ZEA is the
+  only caller. Other mods never enter the picture.
+
+**The import ambiguity** — cosmetic, but real noise. Brigadier's
+`findAmbiguities` feeds each sibling's examples to the others'
+`isValidInput`; a literal's example ("confirm") is valid input for a
+greedy string, hence the warnings. Parse-time was never affected
+(`getRelevantNodes` short-circuits to an exactly-matching literal), so
+`/zea import confirm` already routed correctly — the scan just didn't
+know the literals own those words.
+
+**The /zea menu** — never wired. The root registered only `share`,
+`import` and `capture`; no code anywhere opened a MoulConfig GUI (the
+config side was ready: annotations pinned by tests, `saveNow()` wired
+to the safe-write store — the entrypoint just never asked for a
+screen).
+
+### Fix
+
+- `FeedFilter` — `apply()` now installs `installableFilter()`: the
+  composed feed+search predicate, or a static always-true predicate
+  when nothing filters. Identical to vanilla's own default state; no
+  call site changed; `currentFilter()` keeps its null semantics for
+  callers that only want to know *whether* something filters.
+- `ImportPasteArgument` (new, `share` package) — the paste operand,
+  greedy as before, rejecting exactly the reserved words `confirm` and
+  `cancel` so the ambiguity scan agrees with the parser. A paste key
+  that spelled "confirm" remains reachable via the full URL, exactly
+  as the javadoc always documented. `ShareCommands` uses it;
+  `beginImport` reads the operand through `context.getArgument`.
+- `ConfigScreen` (new, `config` package) — opens the MoulConfig editor
+  (`MoulConfigProcessor` → `MoulConfigEditor` → `GuiElementComponent` →
+  `GuiContext` → `MoulConfigScreenComponent`), with `minecraft.gui`
+  screen accessors per the 26.3 API (the screen moved from
+  `Minecraft` to `Gui` this version). The `/zea` root gained the
+  executor that calls it; the three subcommands are untouched and bare
+  `/zea` now opens the menu. Works on any server; closing returns to
+  the previous screen; saves go through the existing safe-write path.
+
+### Tests performed
+
+- `./gradlew build` green; **518 tests, 0 failures** (was 499).
+- `FeedFilterTest` — three new tests pin that the *installed* filter is
+  never null: All tab, blank search on All (both formerly the crash
+  paths), and composed feed+search still filtering when it should.
+- `ImportPasteArgumentTest` (new, 7 tests) — parse accepts keys, URLs,
+  multi-word text and empty input like a greedy string; rejects
+  exactly `confirm`/`cancel` and nothing else; examples are a key and
+  a URL; the *real* `ShareCommands` tree scans clean of ambiguities;
+  `zea import confirm`/`cancel` still route to the literals and
+  everything else still reaches the paste operand.
+- Counterfactual, run manually during development: reverting the tree
+  to `StringArgumentType.greedyString()` makes
+  `theImportTreeScansCleanOfAmbiguities` fail with exactly the
+  player's reported pairs — the regression test has teeth.
+- In-game testing: none available in this environment. The filter fix
+  is exercised only by the next live session; the MoulConfig screen is
+  likewise compile-verified against the bundled 4.8.0 jar but has
+  never rendered in this environment.
+
+### Outstanding problems
+
+- Live verification of all three fixes pending the player's next
+  session — dev.23 carries them. The rejoin sequence to test: join
+  EarthMC, play, disconnect, rejoin from the multiplayer screen
+  without restarting the client (the exact path that crashed), plus
+  tab switches and search open/close mid-chat.
+- If the 239-mod pack contains another `setVisibleMessageFilter`
+  caller, it and ZEA will overwrite each other's filter on their own
+  triggers — pre-existing interplay, unchanged by this fix, but worth
+  remembering if tab filtering ever looks wrong after a config save.
