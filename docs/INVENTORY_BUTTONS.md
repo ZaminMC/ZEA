@@ -42,7 +42,8 @@ NEU's inventory buttons, with ZEA's safe-persistence rules.
 | `ButtonIcons` | Icon id → `ItemStack`, cached; barrier fallback for unknown ids. |
 | `ButtonTooltips` | Pure tooltip text assembly. |
 | `ButtonDragSession` | The edit-mode drag state machine. |
-| `ButtonEditScreen` | The edit form (vanilla widgets). |
+| `ButtonEditForm` | The edit form's decision logic: apply/validate/refuse, two-click delete. |
+| `ButtonEditScreen` | The edit form (vanilla widgets), delegating to `ButtonEditForm`. |
 
 ## Anchoring
 
@@ -120,9 +121,11 @@ container screens are untouched.
 - Buttons can be dragged over the container itself; their clicks then
   take priority over the slots underneath. This is allowed — the drag is
   the user's explicit choice.
-- Rendering, hover, tooltips, the edit screen and the drag interaction
-  are verified against 26.3 bytecode and unit tests only; they have not
-  been exercised in a live client yet (see WORKLOG).
+- Rendering, hover and tooltips are verified against 26.3 bytecode and
+  unit tests only; they have not been exercised in a live client yet
+  (see WORKLOG). The edit form's decisions (validation order, refusal
+  reasons, two-click delete) are covered by `ButtonEditFormTest`; the
+  drag interaction remains bytecode-verified only.
 - Commands are sent as typed; there is no client-side command allowlist
   beyond the validation rules above. ZEA never invents commands — the
   user configures exactly what runs.

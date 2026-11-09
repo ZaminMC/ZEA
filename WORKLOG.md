@@ -1044,11 +1044,14 @@ Five commits, each landing with its tests:
 - Phase 1 stages are now all implemented to the unit-tested level; the
   remaining Phase 1 work is in-game verification of the whole build.
 
-## 2026-11-09 (session 10) — Local, trade, nation and town classifiers
+## 2026-11-09 (session 10) — Tagged channel classifiers; edit form extraction
 
 ### Work done
 
-One commit, closing the last Stage 2 parser gap:
+Two commits:
+
+**Add local, trade, nation and town chat classifiers** — closing the last
+Stage 2 parser gap:
 
 - `TaggedChannelChat` — payload for player chat on the tagged channels:
   bracket label, the sender's town (nation chat only — observed
@@ -1068,6 +1071,20 @@ One commit, closing the last Stage 2 parser gap:
   (EARTHMC_MESSAGE_FORMATS.md records the observed legacy codes,
   CHAT_CLASSIFICATION.md the parse and the residual ambiguity).
 
+**Extract the button edit form's decisions** — closing the edit-screen
+test gap from session 6:
+
+- `ButtonEditForm` — the edit form's logic without any Screen
+  machinery: applying field values, validation in a fixed order
+  (command before icon, first failure wins, one inline error at a
+  time), the anchor/enabled mutations of the working copy, and the
+  two-click delete confirmation. A refused save leaves the working
+  copy untouched — the text fields stay the source of truth.
+- `ButtonEditScreen` — now widget assembly and wiring only,
+  delegating every decision to the form. The refusal reason carries
+  its translation-key suffix explicitly (`Rejection.key()`), so the
+  lang keys and the enum cannot drift apart silently.
+
 ### Research performed and findings
 
 - The observed samples for all four channels were in the project brief
@@ -1083,19 +1100,24 @@ One commit, closing the last Stage 2 parser gap:
 
 ### Tests performed
 
-- `./gradlew build` green; 468 tests, 0 failures (was 443). New: 15
-  classifier tests (observed shapes, town handling, declines, pipeline
-  ordering), 8 fixture assertions (4 families × category + original
-  retention), 2 mention tests (structured attribution, self-echo).
+- `./gradlew build` green after each commit; 478 tests, 0 failures
+  (was 443). New: 15 classifier tests (observed shapes, town handling,
+  declines, pipeline ordering), 8 fixture assertions (4 families ×
+  category + original retention), 2 mention tests (structured
+  attribution, self-echo), 10 edit-form tests (validation order,
+  refusal reasons, untouched working copy after refusal, slash
+  stripping, anchor/enabled mutations, two-click delete, key/enum
+  agreement).
 - In-game testing: none available in this environment. Text-anchored
   parsing only; component-level structure remains unverified pending
-  in-game capture.
+  in-game capture. The edit screen's widget assembly remains
+  untested; its decisions no longer are.
 
 ### Outstanding problems
 
 - Component-level fixtures for every family (unchanged).
 - Nation chat without a town is unobserved; if it exists it currently
   falls through to the global classifier's single-segment handling.
-- Stage 4 leftovers (nickname username display) and the inventory
-  edit-screen test gap remain. Live HelpChat verification still blocked
-  (paste.helpcha.at does not resolve from this environment).
+- Stage 4 leftovers (nickname username display) remain. Live HelpChat
+  verification still blocked (paste.helpcha.at does not resolve from
+  this environment).

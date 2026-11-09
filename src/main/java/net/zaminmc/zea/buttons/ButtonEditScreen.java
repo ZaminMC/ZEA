@@ -10,7 +10,6 @@ import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,7 +30,7 @@ public final class ButtonEditScreen extends Screen {
         private final InventoryButtons owner;
         private final LinearLayout layout = LinearLayout.vertical().spacing(6);
 
-        private InventoryButton button;
+        private final ButtonEditForm form;
         private EditBox nameField;
         private EditBox commandField;
         private EditBox iconField;
@@ -39,22 +38,21 @@ public final class ButtonEditScreen extends Screen {
         private Component error;
         @Nullable
         private Button deleteButton;
-        private boolean confirmDelete;
 
         public ButtonEditScreen(Screen parent, InventoryButton button, InventoryButtons owner) {
                 super(Component.translatable("zea.buttons.edit.title"));
                 this.parent = parent;
                 this.owner = owner;
-                this.button = button;
+                this.form = new ButtonEditForm(button);
         }
 
         @Override
         protected void init() {
                 layout.defaultCellSetting().alignHorizontallyLeft();
 
-                nameField = field("zea.buttons.edit.name", button.name(), InventoryButton.MAX_NAME_LENGTH);
-                commandField = field("zea.buttons.edit.command", button.command(), InventoryButton.MAX_COMMAND_LENGTH);
-                iconField = field("zea.buttons.edit.icon", button.icon(), InventoryButton.MAX_ICON_LENGTH);
+                nameField = field("zea.buttons.edit.name", form.button().name(), InventoryButton.MAX_NAME_LENGTH);
+                commandField = field("zea.buttons.edit.command", form.button().command(), InventoryButton.MAX_COMMAND_LENGTH);
+                iconField = field("zea.buttons.edit.icon", form.button().icon(), InventoryButton.MAX_ICON_LENGTH);
 
                 layout.addChild(label("zea.buttons.edit.name"));
                 layout.addChild(nameField);
@@ -64,17 +62,16 @@ public final class ButtonEditScreen extends Screen {
                 layout.addChild(iconField);
 
                 CycleButton<ButtonAnchor> anchorField = CycleButton
-                                .<ButtonAnchor>builder(ButtonEditScreen::anchorLabel, button.anchor())
+                                .<ButtonAnchor>builder(ButtonEditScreen::anchorLabel, form.button().anchor())
                                 .withValues(ButtonAnchor.values())
                                 .create(Component.translatable("zea.buttons.edit.anchor"),
-                                                (cycle, value) -> button = button.withAnchor(value));
+                                                (cycle, value) -> form.anchor(value));
                 layout.addChild(anchorField);
 
                 Button enabledField = Button.builder(CommonComponents.OPTION_ON, pressed -> {
-                        button = button.withEnabled(!button.enabled());
-                        pressed.setMessage(CommonComponents.optionStatus(button.enabled()));
+                        pressed.setMessage(CommonComponents.optionStatus(form.toggleEnabled()));
                 }).build();
-                enabledField.setMessage(CommonComponents.optionStatus(button.enabled()));
+                enabledField.setMessage(CommonComponents.optionStatus(form.button().enabled()));
                 layout.addChild(enabledField);
 
                 LinearLayout actions = LinearLayout.horizontal().spacing(4);
@@ -118,32 +115,25 @@ public final class ButtonEditScreen extends Screen {
 
         /** Applies the form, or shows why it cannot be applied yet. */
         private void save() {
-                button = button
-                                .withName(nameField.getValue())
-                                .withCommand(commandField.getValue())
-                                .withIcon(iconField.getValue());
-
-                if (!InventoryButton.validCommand(button.command())) {
-                        error = Component.translatable("zea.buttons.edit.error.command");
+                var result = form.save(nameField.getValue(), commandField.getValue(), iconField.getValue());
+                if (result instanceof ButtonEditForm.Result.Refused refused) {
+                        error = Component.translatable("zea.buttons.edit.error." + refused.reason().key());
                         return;
                 }
-                if (Identifier.tryParse(button.icon()) == null) {
-                        error = Component.translatable("zea.buttons.edit.error.icon");
-                        return;
+                if (result instanceof ButtonEditForm.Result.Saved saved) {
+                        owner.upsert(saved.button());
+                        zea$returnToParent();
                 }
-                owner.upsert(button);
-                zea$returnToParent();
         }
 
         private void delete() {
-                if (!confirmDelete) {
-                        confirmDelete = true;
+                if (!form.requestDelete()) {
                         if (deleteButton != null) {
                                 deleteButton.setMessage(deleteLabel());
                         }
                         return;
                 }
-                owner.delete(button.id());
+                owner.delete(form.button().id());
                 zea$returnToParent();
         }
 
@@ -171,7 +161,7 @@ public final class ButtonEditScreen extends Screen {
         }
 
         private Component deleteLabel() {
-                return Component.translatable(confirmDelete
+                return Component.translatable(form.deleteArmed()
                                 ? "zea.buttons.edit.delete_confirm"
                                 : "zea.buttons.edit.delete");
         }
