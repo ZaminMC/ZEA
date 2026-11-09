@@ -14,6 +14,7 @@ import net.zaminmc.zea.chat.render.ChatCopier;
 import net.zaminmc.zea.chat.render.ChatSearchBar;
 import net.zaminmc.zea.chat.render.ChatTabBar;
 import net.zaminmc.zea.chat.render.CopyToast;
+import net.zaminmc.zea.duck.ScreenWidgetAccess;
 import net.zaminmc.zea.keybind.ZeaKeys;
 import com.mojang.blaze3d.platform.InputConstants;
 import org.spongepowered.asm.mixin.Mixin;
