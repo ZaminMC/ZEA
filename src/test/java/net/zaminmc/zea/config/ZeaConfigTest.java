@@ -24,6 +24,10 @@ class ZeaConfigTest {
                 assertTrue(config.enabledExtraFeedIds().isEmpty(), "no extra tabs by default");
                 assertTrue(config.smoothChatEnabled(), "smooth chat defaults to on");
                 assertEquals(200, config.smoothChatDurationMillis());
+                assertTrue(config.historyEnabled(), "persistent history defaults to on");
+                assertEquals(7, config.historyRetentionDays());
+                assertEquals(7L * 86_400_000L, config.historyRetentionMillis());
+                assertEquals(ZeaConfig.DEFAULT_HISTORY_ENTRIES, config.historyMaxEntries());
         }
 
         @Test
@@ -42,6 +46,24 @@ class ZeaConfigTest {
                 assertEquals(ZeaConfig.MIN_DISPATCH_INTERVAL_MILLIS, config.dispatchIntervalMillis());
                 config.chat.dispatchIntervalMillis = 999_999;
                 assertEquals(ZeaConfig.MAX_DISPATCH_INTERVAL_MILLIS, config.dispatchIntervalMillis());
+        }
+
+        @Test
+        void historySizeIsClampedToTheSliderRange() {
+                ZeaConfig config = new ZeaConfig();
+                config.history.maxEntries = 0;
+                assertEquals(ZeaConfig.MIN_HISTORY_ENTRIES, config.historyMaxEntries());
+                config.history.maxEntries = 999_999;
+                assertEquals(ZeaConfig.MAX_HISTORY_ENTRIES, config.historyMaxEntries());
+        }
+
+        @Test
+        void clearedRetentionFallsBackToOneWeek() {
+                ZeaConfig config = new ZeaConfig();
+                config.history.retention = null;
+                assertEquals(7, config.historyRetentionDays(), "a hand-cleared field must not crash");
+                config.history.retention = ZeaConfig.History.Retention.NINETY_DAYS;
+                assertEquals(90, config.historyRetentionDays());
         }
 
         @Test
@@ -70,12 +92,18 @@ class ZeaConfigTest {
                 original.chat.multiSendEnabled = true;
                 original.chat.dispatchIntervalMillis = 2500;
                 original.tabs.deaths = true;
+                original.history.enabled = false;
+                original.history.retention = ZeaConfig.History.Retention.THIRTY_DAYS;
+                original.history.maxEntries = 5_000;
                 store.save(original);
 
                 ZeaConfig loaded = new ZeaConfigStore(file).load();
                 assertTrue(loaded.multiSendEnabled());
                 assertEquals(2500, loaded.dispatchIntervalMillis());
                 assertTrue(loaded.enabledExtraFeedIds().contains(Feeds.DEATHS.id()));
+                assertFalse(loaded.historyEnabled());
+                assertEquals(30, loaded.historyRetentionDays());
+                assertEquals(5_000, loaded.historyMaxEntries());
         }
 
         @Test
@@ -129,5 +157,7 @@ class ZeaConfigTest {
                 assertTrue(config.multiSendEnabled());
                 assertEquals(1000, config.dispatchIntervalMillis(), "omitted fields fall back to defaults");
                 assertTrue(config.enabledExtraFeedIds().isEmpty());
+                assertTrue(config.historyEnabled(), "a pre-history config file gets history defaults");
+                assertEquals(ZeaConfig.DEFAULT_HISTORY_ENTRIES, config.historyMaxEntries());
         }
 }

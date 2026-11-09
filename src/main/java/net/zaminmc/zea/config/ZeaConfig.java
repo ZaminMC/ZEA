@@ -41,6 +41,13 @@ public final class ZeaConfig extends Config {
         public static final int MIN_AUTO_RESPONSE_COOLDOWN_SECONDS = 10;
         public static final int MAX_AUTO_RESPONSE_COOLDOWN_SECONDS = 300;
 
+        /** History size slider bounds, in entries per server. */
+        public static final int MIN_HISTORY_ENTRIES = 500;
+        public static final int MAX_HISTORY_ENTRIES = 10_000;
+
+        /** The default history size, deliberately far below the maximum. */
+        public static final int DEFAULT_HISTORY_ENTRIES = 2_000;
+
         /** Inventory buttons beside container GUIs. */
         public static final class InventoryButtons {
                 @ConfigOption(name = "Inventory buttons", desc = "Show your custom buttons beside "
@@ -49,6 +56,59 @@ public final class ZeaConfig extends Config {
                 @ConfigEditorBoolean
                 @ConfigOrder(0)
                 public boolean enabled = true;
+        }
+
+        /** Persistent chat history. */
+        public static final class History {
+                /** Retention choices for persistent chat history. */
+                public enum Retention {
+                        ONE_DAY("1 day", 1),
+                        THREE_DAYS("3 days", 3),
+                        SEVEN_DAYS("1 week", 7),
+                        FOURTEEN_DAYS("2 weeks", 14),
+                        THIRTY_DAYS("30 days", 30),
+                        NINETY_DAYS("90 days", 90);
+
+                        private final String label;
+                        private final int days;
+
+                        Retention(String label, int days) {
+                                this.label = label;
+                                this.days = days;
+                        }
+
+                        /** What the MoulConfig dropdown shows for this choice. */
+                        @Override
+                        public String toString() {
+                                return label;
+                        }
+
+                        /** The retention length in whole days. */
+                        public int days() {
+                                return days;
+                        }
+                }
+
+                @ConfigOption(name = "Persistent history", desc = "Remember EarthMC chat between "
+                                + "sessions. History is stored per server, only on this computer, "
+                                + "and is never uploaded.")
+                @ConfigEditorBoolean
+                @ConfigOrder(0)
+                public boolean enabled = true;
+
+                @ConfigOption(name = "History retention", desc = "How long messages survive. Older "
+                                + "messages are removed by the next cleanup — history never grows "
+                                + "without bound.")
+                @ConfigEditorDropdown
+                @ConfigOrder(1)
+                public Retention retention = Retention.SEVEN_DAYS;
+
+                @ConfigOption(name = "History size", desc = "How many messages are kept per "
+                                + "server. Searching covers exactly these.")
+                @ConfigEditorSlider(minValue = MIN_HISTORY_ENTRIES, maxValue = MAX_HISTORY_ENTRIES,
+                                minStep = 500)
+                @ConfigOrder(2)
+                public int maxEntries = DEFAULT_HISTORY_ENTRIES;
         }
 
         /** Chat options. */
@@ -215,6 +275,10 @@ public final class ZeaConfig extends Config {
         @ConfigOrder(5)
         public InventoryButtons inventoryButtons = new InventoryButtons();
 
+        @Category(name = "Chat history", desc = "Persistent, searchable EarthMC chat history.")
+        @ConfigOrder(6)
+        public History history = new History();
+
         /** Set by the store so the MoulConfig editor's saves go through safe-write. */
         private transient Runnable saveAction;
 
@@ -325,6 +389,27 @@ public final class ZeaConfig extends Config {
         /** Whether inventory buttons render; on by default (they do nothing until configured). */
         public boolean inventoryButtonsEnabled() {
                 return inventoryButtons.enabled;
+        }
+
+        /** Whether chat history persists between sessions; on by default, strictly retention-bound. */
+        public boolean historyEnabled() {
+                return history.enabled;
+        }
+
+        /** The selected retention, in days; a hand-cleared field falls back to one week. */
+        public int historyRetentionDays() {
+                History.Retention retention = history.retention;
+                return (retention == null ? History.Retention.SEVEN_DAYS : retention).days();
+        }
+
+        /** The selected retention, in milliseconds. */
+        public long historyRetentionMillis() {
+                return historyRetentionDays() * 86_400_000L;
+        }
+
+        /** The history size limit, clamped to the slider range. */
+        public int historyMaxEntries() {
+                return (int) Math.clamp(history.maxEntries, MIN_HISTORY_ENTRIES, MAX_HISTORY_ENTRIES);
         }
 
         /** The schema version this instance was loaded from (or wrote). */
