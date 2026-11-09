@@ -19,6 +19,7 @@ import net.zaminmc.zea.chat.feeds.OutgoingRouter;
 import net.zaminmc.zea.chat.feeds.SendTargets;
 import net.zaminmc.zea.chat.history.ChatHistory;
 import net.zaminmc.zea.chat.history.HistoryEntry;
+import net.zaminmc.zea.chat.history.HistoryRecorder;
 import net.zaminmc.zea.chat.model.CapturedMessage;
 import net.zaminmc.zea.chat.model.ClassifiedMessage;
 import net.zaminmc.zea.chat.model.WritingChannelReport;
@@ -30,7 +31,9 @@ import net.zaminmc.zea.notify.HudNotificationSurface;
 import net.zaminmc.zea.notify.Notifications;
 import net.zaminmc.zea.notify.UiNotificationSound;
 
+import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.Executor;
 
 /**
  * Coordinates the chat subsystem: capture, classification, channel state,
@@ -51,8 +54,10 @@ public final class ChatSubsystem {
         private final Mentions mentions;
         private final MentionAutoResponder autoResponder;
         private final ChatHistory history;
+        private final HistoryRecorder historyRecorder;
 
-        public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification, ZeaConfig config) {
+        public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification, ZeaConfig config,
+                        Path historyDirectory, Executor historyExecutor) {
                 this.classification = classification;
                 this.classifications = new ClassificationCache(classification, 512);
                 this.config = config;
@@ -64,6 +69,9 @@ public final class ChatSubsystem {
                 this.autoResponder = new MentionAutoResponder(config,
                                 message -> dispatcher.dispatch(List.of(message)));
                 this.history = new ChatHistory(config.historyMaxEntries());
+                this.historyRecorder = new HistoryRecorder(
+                                history, config, historyExecutor, System::currentTimeMillis,
+                                Minecraft.getInstance()::execute);
                 this.mentions = new Mentions(
                                 () -> Minecraft.getInstance().getUser().getName(),
                                 this.notifications,
@@ -71,9 +79,16 @@ public final class ChatSubsystem {
                                 config,
                                 autoResponder);
 
+                ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
+                        // Registered after ClientLifecycle (constructed first in
+                        // ZeaClient), so the identity is already resolved here.
+                        lifecycle.earthMcServer()
+                                        .ifPresent(server -> historyRecorder.start(historyDirectory, server));
+                });
                 ClientTickEvents.END_CLIENT_TICK.register(client -> {
                         dispatcher.tick(System.currentTimeMillis());
                         notifications.tick(System.currentTimeMillis());
+                        historyRecorder.tick();
                 });
                 ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
                         dispatcher.cancel();
@@ -81,14 +96,14 @@ public final class ChatSubsystem {
                         mentions.highlight().clear();
                         autoResponder.reset();
                         channelState.clear();
+                        // Flush the session's history, then end it; the next EarthMC
+                        // join reloads the per-server file.
+                        historyRecorder.stop();
                         // Display state is EarthMC context; leaving resets it so the
                         // vanilla chat is untouched on other servers.
                         feedSelection.select(Feeds.ALL);
                         feedFilter.setSearchQuery(null);
                         feedFilter.apply(client.gui.hud.getChat());
-                        // Session-scoped history ends with the session; the persistent
-                        // store (Stage 7) reloads on the next EarthMC join.
-                        history.clear();
                 });
 
                 new MessageCapture(lifecycle::onEarthMc, this::onCaptured);
@@ -104,6 +119,7 @@ public final class ChatSubsystem {
                 mentions.onClassified(classified, System.currentTimeMillis());
                 if (!captured.text().isBlank()) {
                         history.append(HistoryEntry.of(classified));
+                        historyRecorder.markDirty();
                 }
                 ZeaClient.LOGGER.debug("Classified [{}] {}", classified.category(), captured.text());
         }
@@ -155,6 +171,11 @@ public final class ChatSubsystem {
         /** The session's bounded chat history. */
         public ChatHistory history() {
                 return history;
+        }
+
+        /** Flushes pending history writes; called before the executor closes. */
+        public void shutdownHistory() {
+                historyRecorder.flush();
         }
 
         private void sendCommand(OutgoingMessage message) throws Exception {

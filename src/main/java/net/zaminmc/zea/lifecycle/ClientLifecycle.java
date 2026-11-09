@@ -6,6 +6,9 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import net.zaminmc.zea.ZeaClient;
 import net.zaminmc.zea.earthmc.EarthMcDetector;
+import net.zaminmc.zea.earthmc.ServerIdentity;
+
+import java.util.Optional;
 
 /**
  * Client lifecycle integration: initialization wiring, server join/leave
@@ -16,6 +19,7 @@ import net.zaminmc.zea.earthmc.EarthMcDetector;
  */
 public final class ClientLifecycle {
 	private volatile boolean onEarthMc;
+	private volatile ServerIdentity earthMcServer;
 
 	public ClientLifecycle() {
 		register();
@@ -31,9 +35,23 @@ public final class ClientLifecycle {
 		return onEarthMc;
 	}
 
+	/**
+	 * The identity of the EarthMC server currently connected to — the
+	 * stable per-server key for history and other per-server data. Empty
+	 * on other servers and single-player.
+	 *
+	 * <p>Listeners that consume this on JOIN must be registered after
+	 * this class (Fabric fires join handlers in registration order, and
+	 * {@code ZeaClient} constructs this before any subsystem).
+	 */
+	public Optional<ServerIdentity> earthMcServer() {
+		return Optional.ofNullable(earthMcServer);
+	}
+
 	private void onServerJoin(Minecraft client) {
 		ServerData server = client.getCurrentServer();
 		onEarthMc = server != null && EarthMcDetector.isEarthMcAddress(server.ip);
+		earthMcServer = onEarthMc ? ServerIdentity.of(server.ip).orElse(null) : null;
 		if (onEarthMc) {
 			ZeaClient.LOGGER.info("Connected to EarthMC; EarthMC features enabled");
 		}
@@ -41,6 +59,7 @@ public final class ClientLifecycle {
 
 	private void onServerLeave() {
 		onEarthMc = false;
+		earthMcServer = null;
 	}
 
 	private void onClientStopping() {
