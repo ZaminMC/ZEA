@@ -1129,3 +1129,77 @@ share-document tests that compare exact JSON confirm it).
 - Stage 4 leftovers (nickname username display) remain. Live HelpChat
   verification still blocked (paste.helpcha.at does not resolve from
   this environment).
+
+## 2026-11-09 (session 11) — Chat component capture
+
+### Work done
+
+Two commits:
+
+**Remove a dead duplicate of the shutdown path** — `ZeaClient` carried
+both `shutdownBackgroundWork` (registered on CLIENT_STOPPING) and an
+older private `shutdownHistory` that nothing called; the dead one goes.
+
+**Add chat component capture** — the tool every "pending in-game
+capture" item was waiting for:
+
+- `ComponentJson` — a component tree to its vanilla JSON form through
+  the shared component codec with plain JSON ops (no registry access).
+  Wire form: no client-only style insertion; item/entity hovers cannot
+  encode without registries and surface as errors instead of crashes.
+- `CaptureRecorder` — explicit-request, bounded sessions (100 entries,
+  auto-stop with chat feedback), timestamped files under
+  `zea/capture/`, intermediate flushes every 25 entries through the
+  safe-write protocol, final write always attempted, disconnect only
+  flushes (a session spans rejoins), client shutdown ends it. Same
+  threading contract as the history recorder: client-thread state, IO
+  on a sequential executor, completion marshaled back.
+- `/zea capture on|off|status` — `on` refuses off EarthMC; bare
+  `/zea capture` is `status`. The `/zea` root is now assembled once in
+  the entrypoint (`ShareCommands.register(root, …)` /
+  `CaptureCommands.register(root, …)` contribute branches) instead of
+  each subsystem registering its own root — this also fixes a trap the
+  refactor exposed: the original tree kept `import` a sibling of
+  `share`, which a naive branch extraction would have nested.
+- File schema: `zea-capture` envelope (format + version, like the
+  share documents), entries carrying timestamp, category, plain text,
+  legacy codes, the component JSON, or the serialization error.
+- `CaptureFixtures` (test side) loads capture files back into live
+  components through the same codec — an in-game capture drops
+  straight into a regression test.
+- `VanillaBootstrap` (test side) — the bare test JVM must run
+  `SharedConstants.tryDetectVersion()` + `Bootstrap.bootStrap()` before
+  anything touches `BuiltInRegistries`; the component codec's static
+  chain (Style → ClickEvent → SHOW_DIALOG → Dialog → registries) fails
+  without it. Found by the round-trip tests, pinned by them.
+
+### Research performed and findings
+
+- `ComponentSerialization.CODEC` is a plain `Codec<Component>` usable
+  with `JsonOps.INSTANCE` — no `HolderLookup.Provider` needed for
+  text/style/hover-text/click components. Verified by javap against the
+  mapped 26.3 jar before writing code, then empirically by the tests.
+- Brigadier merges same-name roots at the dispatcher level, but two
+  registration callbacks each owning `zea` would be structural
+  ambiguity all the same; one root owner is the honest shape.
+
+### Tests performed
+
+- `./gradlew build` green; 488 tests, 0 failures (was 478). New: 2
+  component round-trips (literal; styled with hover SHOW_TEXT, click
+  RUN_COMMAND, colored sibling), 7 recorder tests (inactive by default,
+  stamped-file recording, blank skipping, cap auto-stop with feedback
+  and post-stop silence, error-keeping entries, same-second file
+  separation, interval flushes mid-session), 1 fixture loop test
+  (record → stop → load → component, style, hover and click intact).
+- In-game testing: none available in this environment. The capture
+  command paths and file writes are unit-tested; the first real
+  capture happens on EarthMC.
+
+### Outstanding problems
+
+- The first real capture session (needs EarthMC) — then component
+  fixtures, badge hover verification and the nation-chat-without-town
+  question all become answerable from data.
+- Stage 4 leftovers (nickname username display) and live HelpChat
+  verification remain blocked as before.

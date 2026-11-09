@@ -37,7 +37,8 @@ fallback; regression fixtures for every known family.
 Done: all of the above for every family with observed samples, including
 the local/trade/nation/town channel tags (parsed from the observed legacy
 samples; nation chat carries the sender's town). 18 fixture families.
-Pending: component-level fixtures — blocked on in-game captured samples,
+Pending: component-level fixtures — the recording tool exists
+(`/zea capture`, session 11), samples still need an EarthMC session;
 tracked in docs/CHAT_CLASSIFICATION.md.
 
 **Deliverable:** reliable EarthMC message classification.
