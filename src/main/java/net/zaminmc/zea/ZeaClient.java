@@ -14,9 +14,14 @@ import net.zaminmc.zea.config.ZeaConfig;
 import net.zaminmc.zea.config.ZeaConfigStore;
 import net.zaminmc.zea.keybind.ZeaKeys;
 import net.zaminmc.zea.lifecycle.ClientLifecycle;
+import net.zaminmc.zea.share.PasteKey;
+import net.zaminmc.zea.share.PasteService;
+import net.zaminmc.zea.share.ShareCommands;
+import net.zaminmc.zea.share.ShareCoordinator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -39,6 +44,8 @@ public final class ZeaClient implements ClientModInitializer {
 	private static InventoryButtons inventoryButtons;
 	private static ZeaConfig config;
 	private static ExecutorService historyExecutor;
+	private static ExecutorService shareExecutor;
+	private static PasteService pasteService;
 
 	public static ClientLifecycle lifecycle() {
 		return lifecycle;
@@ -73,7 +80,11 @@ public final class ZeaClient implements ClientModInitializer {
 						configDir.resolve("zea/buttons.json"),
 						new ButtonActivator(zea$commandSender(), ButtonActivator.DEFAULT_COOLDOWN_MILLIS));
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> inventoryButtons.reset());
-		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> shutdownHistory());
+		shareExecutor = newShareExecutor();
+		pasteService = new PasteService(URI.create(PasteKey.BASE_URL), shareExecutor);
+		ShareCommands.register(new ShareCoordinator(
+					pasteService, inventoryButtons, config, Minecraft.getInstance()::execute));
+		ClientLifecycleEvents.CLIENT_STOPPING.register(client -> shutdownBackgroundWork());
 		ZeaKeys.register();
 	}
 
@@ -84,13 +95,45 @@ public final class ZeaClient implements ClientModInitializer {
 	 * handled by the recorder rather than by blocking the client thread.
 	 */
 	private static ExecutorService newHistoryExecutor() {
+		return newIoExecutor("ZEA-History");
+	}
+
+	/** Same shape, for the share subsystem's uploads and downloads. */
+	private static ExecutorService newShareExecutor() {
+		return newIoExecutor("ZEA-Share");
+	}
+
+	private static ExecutorService newIoExecutor(String threadName) {
 		return new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-						new ArrayBlockingQueue<>(4),
-						task -> {
-							Thread thread = new Thread(task, "ZEA-History");
-							thread.setDaemon(true);
-							return thread;
-						});
+					new ArrayBlockingQueue<>(4),
+					task -> {
+						Thread thread = new Thread(task, threadName);
+						thread.setDaemon(true);
+						return thread;
+					});
+	}
+
+	/**
+	 * Flush pending history, close the paste client, then drain the
+	 * executors: submitted work finishes before shutdown, and the bounded
+	 * wait never hangs the game on a stuck disk or a stuck request.
+	 */
+	private static void shutdownBackgroundWork() {
+		try {
+			chat.shutdownHistory();
+		} finally {
+			pasteService.close();
+			historyExecutor.shutdown();
+			try {
+				if (!historyExecutor.awaitTermination(HISTORY_SHUTDOWN_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS)) {
+					LOGGER.warn("History writes did not finish within {} ms; continuing shutdown",
+								HISTORY_SHUTDOWN_TIMEOUT_MILLIS);
+				}
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+			}
+			shareExecutor.shutdown();
+		}
 	}
 
 	/**

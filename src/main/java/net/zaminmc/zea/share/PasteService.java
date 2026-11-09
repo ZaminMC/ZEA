@@ -29,7 +29,7 @@ import java.util.concurrent.RejectedExecutionException;
  * production wiring always uses {@link PasteKey#BASE_URL}, whose host
  * the import path additionally pins through {@link PasteKey}.
  */
-public final class PasteService {
+public final class PasteService implements PasteTransport {
         /** Hard cap on downloaded documents; generous for JSON, small for a heap. */
         public static final int MAX_DOCUMENT_BYTES = 1024 * 1024;
 

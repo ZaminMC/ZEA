@@ -118,4 +118,14 @@ public final class InventoryButtons {
 		buttons = List.copyOf(next);
 		store.save(buttons);
 	}
+
+	/**
+	 * Replaces the whole set with an imported one, then persists.
+	 * The import path validates strictly beforehand; nothing here
+	 * executes a command — buttons stay inert data until clicked.
+	 */
+	public void applyImport(List<InventoryButton> imported) {
+		buttons = List.copyOf(imported == null ? List.of() : imported);
+		store.save(buttons);
+	}
 }
