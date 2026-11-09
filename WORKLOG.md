@@ -906,3 +906,69 @@ fault; the entrypoint failure attribution was collateral.
 
 - Unchanged from session 6 (Stage 4 leftovers, edit-screen test gap,
   Stage 8 share/import).
+
+## 2026-11-09 (session 8) — Stage 7: persistent chat history
+
+### Work done
+
+Built out in five commits, each independently verifiable:
+
+- `HistoryEntry` + `ServerIdentity` — the immutable recorded row
+  (timestamp, category, plain text, formatted text) and the stable
+  per-server key. Identity is the address the client actually dialed
+  (lower-cased host, default port stripped), not the MOTD brand —
+  `earthmc.net` and a direct node address key different files.
+- History configuration — `history.enabled`, `history.size`
+  (entries, default 5000), `history.retention` (ONE_DAY … FOREVER,
+  default 30 days) grouped under `history` in the config screen.
+- `ChatHistory` — the bounded in-memory buffer (lock-guarded, immutable
+  snapshots) that already served Stage 4 search; session-only or
+  persistent is purely a matter of who seeds and flushes it.
+- `HistoryStore` — per-server JSON through the existing safe-write
+  protocol (serialize in memory, round-trip verify, atomic replace,
+  corrupt file quarantined as `*.corrupted`). Schema `{"version": 1,
+  "entries": [{"t", "c", "p", "f"}]}`; per-entry tolerance mirrors
+  inventory buttons — one hand-edited row never quarantines the file.
+- `HistoryRecorder` — the session coordinator: seeds on join
+  (asynchronous load), batches dirty writes at most every 30 s onto a
+  bounded single-thread executor, re-enforces retention every 5 min
+  (before the flush, so cleanup persists in the same write), flushes on
+  disconnect and on client shutdown. Writes coalesce while one is in
+  flight; a rejected submission is retried on a later tick.
+  `ZeaClient` owns the executor (daemon thread, queue of 4) and drains
+  it with a 5 s bounded wait on CLIENT_STOPPING.
+
+Search needed no new work: Stage 4's `FeedFilter` already searches the
+`ChatHistory` buffer, which persistence now seeds on join — so chat
+search transparently covers previous sessions' messages.
+
+### Threading decisions
+
+- Recorder state (`dirty`, `writing`, `store`) is confined to the
+  client thread; the executor only does file IO and marshals results
+  back through `Minecraft::execute`.
+- The load is submitted before any save can be (executor is
+  sequential), so the first save always observes the file the load
+  read — no clobber window.
+- Configuration is sampled per session; toggling persistence or
+  retention applies on the next join, never retroactively.
+
+### Tests performed
+
+- `./gradlew build` green; 356 tests, 0 failures (10 new
+  `HistoryRecorderTest` methods: seeding, disabled persistence,
+  flush interval, clean-history no-writes, in-flight coalescing,
+  disconnect flush, retention schedule, rejected-write retry,
+  per-server isolation, rejected load).
+- Fixed three test bugs from the interrupted authoring session before
+  landing: a self-contradictory assertion (pre-created file asserted
+  absent — now asserts its content unchanged), a rejection list that
+  rejected the join load instead of the save, and a deferring executor
+  whose queued load/save tasks were never drained.
+- In-game testing: none available in this environment. Mixin surface
+  unchanged this stage, so no new bytecode risk.
+
+### Outstanding problems
+
+- Stage 4 leftovers and the edit-screen test gap are unchanged.
+- Stage 8 (HelpChat sharing) is the last Phase 1 stage.
