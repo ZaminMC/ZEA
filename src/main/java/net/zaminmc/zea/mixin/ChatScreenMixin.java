@@ -10,10 +10,15 @@ import net.zaminmc.zea.chat.ChatSubsystem;
 import net.zaminmc.zea.chat.feeds.Feed;
 import net.zaminmc.zea.chat.feeds.FeedFilter;
 import net.zaminmc.zea.chat.feeds.Feeds;
+import net.zaminmc.zea.chat.feeds.MultiSendInteraction;
+import net.zaminmc.zea.chat.feeds.MultiSendResult;
+import net.zaminmc.zea.chat.feeds.SendTargets;
+import net.zaminmc.zea.chat.feeds.WriteChannel;
 import net.zaminmc.zea.chat.render.ChatCopier;
 import net.zaminmc.zea.chat.render.ChatSearchBar;
 import net.zaminmc.zea.chat.render.ChatTabBar;
 import net.zaminmc.zea.chat.render.CopyToast;
+import net.zaminmc.zea.chat.render.MultiSendToast;
 import net.zaminmc.zea.duck.ScreenWidgetAccess;
 import net.zaminmc.zea.keybind.ZeaKeys;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -24,10 +29,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
+import java.util.stream.Collectors;
+
 /**
- * Adds ZEA's chat-screen behavior: the chat tab strip, the search field
- * (Ctrl+F), and right-click message copying. Active only while connected
- * to EarthMC — elsewhere the vanilla chat is untouched.
+ * Adds ZEA's chat-screen behavior: the chat tab strip (with shift-click
+ * multi-send targeting), the search field (Ctrl+F), right-click message
+ * copying, and multi-target send interception. Active only while
+ * connected to EarthMC — elsewhere the vanilla chat is untouched.
  */
 @Mixin(ChatScreen.class)
 public abstract class ChatScreenMixin {
@@ -60,9 +68,16 @@ public abstract class ChatScreenMixin {
 				screen.width - 4,
 				Feeds.visibleTabs(ZeaClient.config().enabledExtraFeedIds()),
 				chat.feedSelection(),
+				feed -> MultiSendInteraction.isTargeted(
+					chat.sendTargets(), ZeaClient.config().multiSendEnabled(), feed),
 				feed -> {
 					chat.feedSelection().select(feed);
 					filter.apply(minecraft.gui.hud.getChat());
+				},
+				feed -> {
+					MultiSendInteraction.ToggleOutcome outcome = MultiSendInteraction.toggleTarget(
+						chat.sendTargets(), feed, ZeaClient.config().multiSendEnabled());
+					MultiSendToast.showToggle(minecraft, outcome, feed.label());
 				});
 		// addRenderableWidget is protected on Screen and inherited, so it
 		// cannot be @Shadowed here — ScreenMixin exposes it instead.
@@ -170,6 +185,40 @@ public abstract class ChatScreenMixin {
 		}
 		CopyToast.show(minecraft, result);
 		cir.setReturnValue(true);
+	}
+
+	/**
+	 * A send with shift-click targets selected goes to those channels
+	 * instead of the server's current one: one message per target,
+	 * staggered by the configured interval. Slash commands stay vanilla
+	 * — a player typing a command means the command. The interception
+	 * mirrors what vanilla does next: the normalized text enters the
+	 * up-arrow recall, and cancelling lets the caller's close-or-clear
+	 * behavior run unchanged.
+	 */
+	@Inject(method = "handleChatInput", at = @At("HEAD"), cancellable = true)
+	private void zea$sendToTargets(String text, boolean addRecent, CallbackInfo ci) {
+		ChatSubsystem chat = ZeaClient.chat();
+		if (chat == null || !ZeaClient.lifecycle().onEarthMc()) {
+			return;
+		}
+		String message = ((ChatScreen) (Object) this).normalizeChatMessage(text);
+		SendTargets targets = chat.sendTargets();
+		if (!MultiSendInteraction.shouldIntercept(
+			targets, ZeaClient.config().multiSendEnabled(), message)) {
+		return;
+		}
+		Minecraft minecraft = Minecraft.getInstance();
+		if (addRecent) {
+			minecraft.gui.hud.getChat().addRecentChat(message);
+		}
+		if (chat.sendToTargets(targets, message) == MultiSendResult.DISPATCHING) {
+			String destinations = targets.targets().stream()
+				.map(WriteChannel::label)
+				.collect(Collectors.joining(", "));
+			MultiSendToast.showAccepted(minecraft, targets.targets().size(), destinations);
+		}
+		ci.cancel();
 	}
 
 	private void zea$openSearch(ChatScreen screen, FeedFilter filter, Minecraft minecraft) {

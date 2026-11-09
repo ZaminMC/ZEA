@@ -24,6 +24,7 @@ import net.zaminmc.zea.chat.history.HistoryRecorder;
 import net.zaminmc.zea.chat.model.CapturedMessage;
 import net.zaminmc.zea.chat.model.ClassifiedMessage;
 import net.zaminmc.zea.chat.model.WritingChannelReport;
+import net.zaminmc.zea.chat.render.MultiSendToast;
 import net.zaminmc.zea.config.ZeaConfig;
 import net.zaminmc.zea.lifecycle.ClientLifecycle;
 import net.zaminmc.zea.mention.MentionAutoResponder;
@@ -49,6 +50,7 @@ public final class ChatSubsystem {
 	private final OutgoingRouter router = new OutgoingRouter();
 	private final ChannelState channelState = new ChannelState();
 	private final FeedSelection feedSelection = new FeedSelection(Feeds.ALL);
+	private final SendTargets sendTargets = new SendTargets();
 	private final FeedFilter feedFilter = new FeedFilter(classifications(), feedSelection);
 	private final MultiChannelDispatcher dispatcher;
 	private final Notifications notifications;
@@ -66,7 +68,7 @@ public final class ChatSubsystem {
 		this.capture = capture;
 		this.dispatcher = new MultiChannelDispatcher(
 				this::sendCommand,
-				new DispatchLogger(),
+				new DispatchFeedback(),
 				config.dispatchIntervalMillis());
 		this.notifications = new Notifications(new HudNotificationSurface(), config, new UiNotificationSound());
 		this.autoResponder = new MentionAutoResponder(config,
@@ -105,6 +107,7 @@ public final class ChatSubsystem {
 			// Display state is EarthMC context; leaving resets it so the
 			// vanilla chat is untouched on other servers.
 			feedSelection.select(Feeds.ALL);
+			sendTargets.clear();
 			feedFilter.setSearchQuery(null);
 			feedFilter.apply(client.gui.hud.getChat());
 		});
@@ -155,6 +158,11 @@ public final class ChatSubsystem {
 		return feedSelection;
 	}
 
+	/** The shift-click selected multi-send destinations; cleared on disconnect. */
+	public SendTargets sendTargets() {
+		return sendTargets;
+	}
+
 	public FeedFilter feedFilter() {
 		return feedFilter;
 	}
@@ -189,8 +197,13 @@ public final class ChatSubsystem {
 		connection.sendCommand(message.commandLine());
 	}
 
-	/** Dispatch feedback; surfaced to the chat interface in Stage 4. */
-	private static final class DispatchLogger implements MultiChannelDispatcher.Listener {
+	/**
+	 * Dispatch feedback: every outcome is logged; failures additionally
+	 * toast, because a stopped multi-send otherwise looks like the server
+	 * ignoring the player. Toasts — not chat lines — because the chat HUD
+	 * is feed-filtered and would hide them on a channel tab.
+	 */
+	private static final class DispatchFeedback implements MultiChannelDispatcher.Listener {
 		@Override
 		public void onDispatched(OutgoingMessage message, int remaining) {
 			ZeaClient.LOGGER.debug("Dispatched to {} ({} remaining)", message.command(), remaining);
@@ -200,10 +213,17 @@ public final class ChatSubsystem {
 		public void onFailed(OutgoingMessage message, Throwable cause, int cancelled) {
 			ZeaClient.LOGGER.warn("Dispatch to {} failed, cancelled {} remaining: {}",
 					message.command(), cancelled, cause.toString());
+			Minecraft minecraft = Minecraft.getInstance();
+			if (minecraft.gui != null) {
+				MultiSendToast.showDispatchFailed(minecraft, message.command(), cancelled);
+			}
 		}
 
 		@Override
 		public void onCancelled(int remaining) {
+			// Disconnect and dispatch replacement both land here; the
+			// disconnect reset already explains itself, a replaced batch is
+			// immediately superseded by its acceptance toast.
 			ZeaClient.LOGGER.info("Cancelled multi-channel dispatch ({} remaining)", remaining);
 		}
 	}
