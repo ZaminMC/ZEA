@@ -46,6 +46,16 @@ public abstract class ChatScreenMixin {
 	/** Vanilla draws the input background this far above the screen bottom. */
 	private static final int INPUT_STRIP_HEIGHT = 14;
 
+	/**
+	 * The shortcut-key code for F. {@code KeyEvent.shortcutKey()} reports
+	 * letters as their lowercase ASCII code — vanilla's own narrator
+	 * hotkey compares {@code == 98} ('b'), its copy/paste helpers 99/118 —
+	 * while {@code InputConstants.KEY_F} holds the HID usage code (9).
+	 * Comparing against the HID constant never matches, which is why
+	 * Ctrl+F could not open the search: the dev.24 live report.
+	 */
+	private static final int SHORTCUT_KEY_F = 'f';
+
 	@Shadow
 	protected EditBox input;
 
@@ -118,7 +128,7 @@ public abstract class ChatScreenMixin {
 		ChatScreen screen = (ChatScreen) (Object) this;
 		Minecraft minecraft = Minecraft.getInstance();
 
-		if (event.hasControlDownWithQuirk() && event.shortcutKey() == InputConstants.KEY_F
+		if (event.hasControlDownWithQuirk() && event.shortcutKey() == SHORTCUT_KEY_F
 				|| ZeaKeys.SEARCH_CHAT.matches(event)) {
 			if (filter.searchQuery() == null) {
 				zea$openSearch(screen, filter, minecraft);
