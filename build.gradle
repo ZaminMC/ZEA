@@ -27,6 +27,22 @@ dependencies {
         implementation "org.notenoughupdates.moulconfig:modern-26.3:${project.moulconfig_version}"
         include "org.notenoughupdates.moulconfig:modern-26.3:${project.moulconfig_version}"
 
+        // MoulConfig is written in Kotlin and its jar declares no Kotlin
+        // dependency — its slider editor loads Kotlin classes on first use,
+        // so /zea crashed with NoClassDefFoundError unless another mod
+        // happened to ship a Kotlin runtime (the live pack did not). Fabric
+        // Language Kotlin is the canonical bundling vehicle: a small Fabric
+        // mod nesting the Kotlin stdlib; the loader deduplicates it against
+        // any copy the pack already carries.
+        implementation "net.fabricmc:fabric-language-kotlin:${project.flk_version}"
+        include "net.fabricmc:fabric-language-kotlin:${project.flk_version}"
+
+        // The Kotlin runtime above is nested inside FLK where a plain JVM
+        // cannot see it; the processor-level config tests need the stdlib
+        // directly.
+        testRuntimeOnly "org.jetbrains.kotlin:kotlin-stdlib:${project.kotlin_version}"
+
+
         testImplementation "org.junit.jupiter:junit-jupiter:${project.junit_version}"
         testRuntimeOnly "org.junit.platform:junit-platform-launcher:${project.junit_launcher_version}"
         testRuntimeOnly "org.slf4j:slf4j-simple:${project.slf4j_version}"
