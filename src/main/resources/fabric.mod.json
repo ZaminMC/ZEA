@@ -19,6 +19,9 @@
         "entrypoints": {
                 "client": [
                         "net.zaminmc.zea.ZeaClient"
+                ],
+                "modmenu": [
+                        "net.zaminmc.zea.config.ModMenuIntegration"
                 ]
         },
         "depends": {
