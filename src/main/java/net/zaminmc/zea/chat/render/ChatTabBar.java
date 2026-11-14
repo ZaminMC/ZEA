@@ -1,10 +1,12 @@
 package net.zaminmc.zea.chat.render;
 
 import net.minecraft.ChatFormatting;
+import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.TextAlignment;
 import net.minecraft.client.gui.components.Tooltip;
+import net.minecraft.client.gui.navigation.FocusNavigationEvent;
 import net.minecraft.client.gui.narration.NarratedElementType;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -35,6 +37,14 @@ import java.util.function.Predicate;
  * <p>Rendering is deliberately restrained: flat translucent backgrounds, no
  * borders, no icons, no animation. The selected tab is simply the most
  * solid and the only one with white text.
+ *
+ * <p>The strip is mouse-driven and refuses keyboard focus navigation: 26.3
+ * screens navigate focus with Tab and the arrow keys, and with this bar
+ * registered as a focusable child, pressing up or down while typing in the
+ * chat input (history recall) would move screen focus onto the strip and
+ * silently eat every following keystroke — the dev.24 live report of losing
+ * the caret mid-sentence. Vanilla chat survives those keys only because
+ * its input is the sole widget on the screen.
  */
 public final class ChatTabBar extends AbstractWidget {
 	/** Height of the tab strip; the chat screen positions the bar with it. */
@@ -128,6 +138,12 @@ public final class ChatTabBar extends AbstractWidget {
 	@Override
 	public void playDownSound(SoundManager soundManager) {
 		// Tab selection is a quiet visual action, not a button press.
+	}
+
+	/** Never a keyboard-navigation target; see the class javadoc. */
+	@Override
+	public ComponentPath nextFocusPath(FocusNavigationEvent navigationEvent) {
+		return null;
 	}
 
 	@Override

@@ -116,7 +116,13 @@ public abstract class ChatScreenMixin {
 	/**
 	 * Ctrl+F toggles the search field. Escape closes an open search before
 	 * it closes the screen. While the search field is focused, confirmation
-	 * returns focus to the chat input instead of sending its text.
+	 * returns focus to the chat input instead of sending its text. Tab is
+	 * consumed outright: 26.3 screens treat it as focus navigation, and
+	 * even when that navigation finds no target (all of ZEA's chat widgets
+	 * refuse it, and vanilla's input is guarded by canLoseFocus=false) the
+	 * search for one still clears the screen's focus — after which typed
+	 * characters reach no widget until the player clicks the input again.
+	 * A chat box has no Tab semantics worth that trap.
 	 */
 	@Inject(method = "keyPressed", at = @At("HEAD"), cancellable = true)
 	private void zea$handleSearchKeys(KeyEvent event, CallbackInfoReturnable<Boolean> cir) {
@@ -128,6 +134,10 @@ public abstract class ChatScreenMixin {
 		ChatScreen screen = (ChatScreen) (Object) this;
 		Minecraft minecraft = Minecraft.getInstance();
 
+		if (event.isCycleFocus()) {
+			cir.setReturnValue(true);
+			return;
+		}
 		if (event.hasControlDownWithQuirk() && event.shortcutKey() == SHORTCUT_KEY_F
 				|| ZeaKeys.SEARCH_CHAT.matches(event)) {
 			if (filter.searchQuery() == null) {
@@ -251,8 +261,23 @@ public abstract class ChatScreenMixin {
 		}
 		zea$searchBar.visible = true;
 		zea$searchBar.setValue("");
-		screen.setFocused(zea$searchBar);
+		zea$moveFocus(screen, zea$searchBar);
 		filter.apply(minecraft.gui.hud.getChat());
+	}
+
+	/**
+	 * Moves screen focus to another widget. The vanilla chat input is
+	 * built to never give focus up ({@code setCanLoseFocus(false)} in
+	 * {@code ChatScreen.init}), so a plain {@code setFocused} would leave
+	 * both edit boxes holding the focused flag — two carets and confused
+	 * IME state. Letting the input unfocus for the duration of the move
+	 * transfers focus for real; it goes back to refusing the moment it
+	 * regains focus.
+	 */
+	private void zea$moveFocus(ChatScreen screen, EditBox target) {
+		input.setCanLoseFocus(true);
+		screen.setFocused(target);
+		input.setCanLoseFocus(false);
 	}
 
 	private void zea$closeSearch(ChatScreen screen, FeedFilter filter, Minecraft minecraft) {
