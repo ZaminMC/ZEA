@@ -1830,3 +1830,165 @@ Lifecycle ownership, not null checks:
   stands, and now cuts both ways: a foreign filter that replaces ZEA's
   stops retention until ZEA re-applies, because the wrap only retains
   for `Installed` predicates.
+
+## 2026-11-14 (session 3) — The second live report: switching lag, the stolen caret, and the /zea that never opened
+
+### What happened
+
+The player's verdict on the tab system as it stood: "the way you
+implemented chat filters channels etc absolutely suck. They lag, kick
+out of game, and freeze" — with Polyfrost/Chatting named as the
+seamless-switching standard to match. Three more findings arrived with
+it: the caret vanishing mid-typing (the player had to click the chat
+bar to keep typing), `/zea` never opening the MoulConfig menu, and a
+request for ModMenu support. The kick is the dev.23 null-cache crash,
+already fixed in the dev.24 commits; everything else was new
+investigation, all against the mapped 26.3 bytecode and the bundled
+4.8.0 jar before any change was made.
+
+### Root causes
+
+**The switching lag and freezes** — two compounding costs inside every
+`refreshTrimmedMessages`, which runs on every tab click, every search
+keystroke, and every filter re-apply:
+
+- Vanilla re-wraps every stored message per rebuild:
+  `addMessageToDisplayQueue` calls `GuiMessage.splitLines`, which runs
+  the font-width wrap each time — no memoization anywhere. With the
+  pack's MoreChatHistory widening `allMessages` far past vanilla's 100
+  messages, every switch re-measured and re-allocated the entire
+  history's line wrapping.
+- `ClassificationCache(512)` was sized for vanilla's window. With a
+  ~1000-message store, FIFO eviction guaranteed hundreds of misses per
+  switch, and each miss re-ran the whole classifier pipeline
+  synchronously inside the rebuild loop — regex over hundreds of
+  components, again on every switch.
+
+**The stolen caret** — 26.3's `Screen.keyPressed` navigates focus with
+Tab and all four arrow keys. Vanilla chat is immune only because its
+input is the single widget on the screen; the navigation finds no
+other target. ZEA's tab strip and search bar, added as ordinary
+focusable children, became real targets: an up-arrow (history recall —
+a normal thing to press while typing) moved screen focus onto the
+strip, and every following keystroke went nowhere. Tab had its own
+trap: finding no target, the navigation still calls `clearFocus`,
+which nulls the screen's focused widget — typing dies until the player
+clicks the input again.
+
+**The dead Ctrl+F** — `KeyEvent.shortcutKey()` reports letters as
+lowercase ASCII (vanilla's narrator hotkey compares `== 98`, 'b'), but
+the mixin compared it against `InputConstants.KEY_F`, the HID usage
+code (9). `102 == 9` never fires, so the advertised search hotkey could
+not open anything.
+
+**The /zea that opened nothing** — two independent defects, either of
+which alone kills the menu:
+
+- `ConfigScreen` built the editor over a processor that had no editor
+  factories registered (`withDefaults` was never called) and had never
+  been driven (`ConfigProcessorDriver.processConfig` was never run):
+  zero categories, zero options, finalized-check warning — an empty
+  husk.
+- MoulConfig 4.8.0 is written in Kotlin and its jar declares no Kotlin
+  dependency; its slider editor loads `SliderWithTextComponent` (Kotlin)
+  on first use, which needs `kotlin.jvm.internal.Intrinsics`. Without
+  another mod shipping a Kotlin runtime, `/zea` died with
+  `NoClassDefFoundError` — reproduced in the test JVM, which is how it
+  was found. The live pack evidently carries no Kotlin.
+
+**ModMenu** — never wired: no `modmenu` entrypoint, no API dependency.
+
+### Fix
+
+Performance, Chatting-style instant switching within ZEA's own
+architecture (no renderer replacement, no new mixins beyond one inert
+inject):
+
+- `SplitLineCache` (new, `chat.render`) — memoizes each message's wrap,
+  stamped with font and width so a resource reload or chat-width change
+  re-wraps. Wired into the existing `splitLines` wrap in
+  `ChatComponentMixin`, EarthMC-gated so vanilla behavior elsewhere is
+  byte-for-byte. Bounded FIFO at 2048, cleared when `clearMessages`
+  runs (new TAIL inject — pinned in MixinSurfaceTest).
+- `ChatSubsystem` — the classification cache window widens 512 → 2048
+  to cover the widened store; still FIFO-bounded.
+- The retention wrap now classifies at ingest: every message passing a
+  ZEA-installed filter is classified once as it arrives (messages the
+  capture event already classified hit the cache; MoreChatHistory
+  restores and All-tab accepts get classified here instead of inside
+  the next switch's rebuild). Later rebuilds are lookups.
+
+Focus:
+
+- `ChatTabBar` and `ChatSearchBar` override `nextFocusPath` to return
+  null — mouse-driven widgets, never keyboard-navigation targets. The
+  search bar still receives focus programmatically from the Ctrl+F
+  toggle and returns it on close.
+- The key handler consumes Tab outright on EarthMC (it has no chat
+  meaning worth the focus-clearing trap). Up/Down now fall through to
+  vanilla's history recall exactly as before, because the navigation
+  finds no target anymore.
+- Opening the search moves focus for real: the chat input's
+  `canLoseFocus(false)` is lifted for the duration of the
+  `setFocused` call, so the input's focused flag actually clears
+  instead of leaving two carets and confused IME state.
+
+The search hotkey compares against `'f'` (the ASCII code), documented
+against vanilla's own narrator/copy/paste comparisons.
+
+The config menu:
+
+- `ConfigScreen.process` — `MoulConfigProcessor.withDefaults` +
+  `ConfigProcessorDriver(checkExpose = false).processConfig` (the
+  `@Expose` convention belongs to MoulConfig's Gson persistence; ZEA
+  persists through its own store). `create(config, previous)` returns
+  the screen for ModMenu; `open` keeps the `/zea` behavior.
+- Fabric Language Kotlin 1.14.2+kotlin.2.4.21 is now jar-in-jar'd —
+  the canonical vehicle for the Kotlin runtime MoulConfig silently
+  needs; the loader deduplicates it against any copy the pack already
+  carries. (MoulConfig's own manifest is mis-merged upstream — its
+  root `fabric.mod.json` identifies as `libninepatch` — noted here in
+  case it ever matters; it loads and works regardless.)
+- `ModMenuIntegration` implements `ModMenuApi` and hands ModMenu the
+  same `ConfigScreen.create`; declared under the `modmenu` entrypoint.
+  ModMenu 21.0.1 (targets `minecraft >= 26.3`) is a dev-run dependency
+  only — no hard `depends`, nothing bundled: ZEA works without it.
+
+### Tests performed
+
+- `./gradlew build` green; **539 tests, 0 failures** (was 522).
+- `SplitLineCacheTest` (new, 10) — hit/miss, per-message independence,
+  width invalidation, stamp overwrite, FIFO eviction at capacity,
+  clear, constructor bounds.
+- `ConfigScreenTest` (new, 3) — the processor is finalized after
+  processing, all seven categories survive, every category carries its
+  options. Counterfactual, run manually: restoring the old
+  no-recipe `process()` fails all three — the dev.24 defect is now a
+  build failure.
+- `ChatWidgetsFocusTest` (new, 1) — reads the compiled bytecode of
+  both widgets (a real `Font` cannot exist in a test JVM) and pins
+  that `nextFocusPath` is overridden and can only answer null.
+- `ModMenuWiringTest` (new, 3) — the `modmenu` entrypoint is declared
+  and points at the integration; the integration implements
+  `ModMenuApi`; modmenu stays absent from `depends` and `jars`.
+- `MixinSurfaceTest` — pins `clearMessages(boolean)` as declared by
+  `ChatComponent` in 26.3, per the file's own rule.
+- The 522 existing tests, including `ChatSubsystemWiringTest`'s
+  construction-order pin and `FeedFilterTest`'s 29 filter-semantics
+  cases, all still green.
+
+### Outstanding problems
+
+- Live verification pending the next session — dev.24 carries
+  everything. The sequences to test: rapid repeated tab switching with
+  a history mod installed (the lag path), typing + up-arrow history
+  recall (the caret path), Ctrl+F open/narrow/close (the hotkey path),
+  `/zea` and ModMenu's config button (the menu path, now with Kotlin
+  bundled).
+- The first switch after a join can still pay a one-time cost for
+  messages that predate any installed filter (classification happens
+  lazily in the predicate for those); every later switch is memoized.
+- MoulConfig's upstream manifest mis-merge (`libninepatch` id) is
+  cosmetic for now but worth re-checking on their next release.
+- The EarthMC API client (hover cards) remains parked behind this
+  repair work, per the session plan.
