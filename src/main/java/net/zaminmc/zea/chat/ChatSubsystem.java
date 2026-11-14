@@ -63,7 +63,14 @@ public final class ChatSubsystem {
 	public ChatSubsystem(ClientLifecycle lifecycle, ClassificationPipeline classification, ZeaConfig config,
 			CaptureRecorder capture, Path historyDirectory, Executor historyExecutor) {
 		this.classification = classification;
-		this.classifications = new ClassificationCache(classification, 512);
+		// 2048 keeps the remembered classifications covering the chat
+		// store even when a history mod widens it far past vanilla's
+		// 100-message window (the live pack runs MoreChatHistory): a
+		// cache smaller than the store re-runs the classification
+		// pipeline inside every tab switch's rebuild — once per
+		// overflowed message, per switch — which the dev.24 session
+		// felt as lag and freezes while switching feeds.
+		this.classifications = new ClassificationCache(classification, 2048);
 		this.config = config;
 		this.capture = capture;
 		// Constructed here — after the cache exists — never in a

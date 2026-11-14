@@ -9,9 +9,11 @@ import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.multiplayer.chat.GuiMessage;
 import net.minecraft.util.FormattedCharSequence;
 import net.zaminmc.zea.ZeaClient;
+import net.zaminmc.zea.chat.ChatSubsystem;
 import net.zaminmc.zea.chat.feeds.FeedFilter;
 import net.zaminmc.zea.chat.render.ChatGeometry;
 import net.zaminmc.zea.chat.render.SmoothChat;
+import net.zaminmc.zea.chat.render.SplitLineCache;
 import org.joml.Matrix3x2fStack;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -60,6 +62,8 @@ public abstract class ChatComponentMixin {
 	}
 
 	private final SmoothChat zea$smoothChat = new SmoothChat();
+	/** Memoized line wraps for the display rebuilds; see {@link SplitLineCache}. */
+	private final SplitLineCache zea$splitLines = new SplitLineCache(2048);
 	/** Set while addMessageToDisplayQueue runs, to skip its internal pin scroll. */
 	private boolean zea$inAddMessage;
 	/** Set while refreshTrimmedMessages rebuilds the display list. */
@@ -75,13 +79,25 @@ public abstract class ChatComponentMixin {
 	/**
 	 * Counts the wrapped lines of each added message; needed because the
 	 * trimmed list is capped at 100 entries, so growth alone under-reports
-	 * on busy channels.
+	 * on busy channels. On EarthMC the wrap itself is memoized — a
+	 * rebuild re-adds the whole history, and re-wrapping every message
+	 * per tab switch is the live-reported lag — while everywhere else
+	 * vanilla's compute-per-call behavior is kept byte-for-byte.
 	 */
 	@WrapOperation(method = "addMessageToDisplayQueue", at = @At(value = "INVOKE",
 			target = "Lnet/minecraft/client/multiplayer/chat/GuiMessage;splitLines(Lnet/minecraft/client/gui/Font;I)Ljava/util/List;"))
 	private List<FormattedCharSequence> zea$countAddedLines(GuiMessage message, Font font, int maxWidth,
 			Operation<List<FormattedCharSequence>> original) {
-		List<FormattedCharSequence> lines = original.call(message, font, maxWidth);
+		List<FormattedCharSequence> lines;
+		if (zea$onEarthMc()) {
+			lines = zea$splitLines.cached(message, font, maxWidth);
+			if (lines == null) {
+				lines = original.call(message, font, maxWidth);
+				zea$splitLines.remember(message, font, maxWidth, lines);
+			}
+		} else {
+			lines = original.call(message, font, maxWidth);
+		}
 		zea$pendingLines = lines.size();
 		return lines;
 	}
@@ -170,14 +186,28 @@ public abstract class ChatComponentMixin {
 	 * feed and the All aggregate. Any other filter (vanilla's own
 	 * chat-trust filter, other mods') keeps vanilla's drop semantics —
 	 * the wrap is then a pure passthrough.
+	 *
+	 * <p>Messages passing a ZEA filter are also classified right here,
+	 * once, as they arrive: the feed predicate classifies on cache miss,
+	 * so a message that skips this step (history restored by another
+	 * mod, or accepted by the always-true All filter) would otherwise
+	 * run the whole pipeline inside the next tab switch's rebuild —
+	 * repeatedly, once per switch, until the cache sees it. With the
+	 * wrap classifying at ingest, every later rebuild is a lookup.
 	 */
 	@WrapOperation(method = "addMessage", at = @At(value = "INVOKE",
 			target = "Ljava/util/function/Predicate;test(Ljava/lang/Object;)Z"))
 	private boolean zea$retainMessagesHiddenByZeaFilters(Predicate<GuiMessage> filter, Object message,
 			Operation<Boolean> original) {
 		boolean shown = original.call(filter, message);
-		if (!shown && filter instanceof FeedFilter.Installed) {
-			addMessageToQueue((GuiMessage) message);
+		if (filter instanceof FeedFilter.Installed) {
+			ChatSubsystem chat = ZeaClient.chat();
+			if (chat != null) {
+				chat.classifications().classificationOf(((GuiMessage) message).content());
+			}
+			if (!shown) {
+				addMessageToQueue((GuiMessage) message);
+			}
 		}
 		return shown;
 	}
@@ -210,6 +240,17 @@ public abstract class ChatComponentMixin {
 		chatScrollbarPos = zea$scrollBeforeRefresh;
 		newMessageSinceScroll = false;
 		scrollChat(0);
+	}
+
+	/**
+	 * The chat forgetting its messages forgets their wraps with them:
+	 * keeping the memo alive past {@code clearMessages} would pin the
+	 * components of a dead conversation for no rebuild that can ever
+	 * ask for them again.
+	 */
+	@Inject(method = "clearMessages", at = @At("TAIL"))
+	private void zea$forgetSplitLines(CallbackInfo ci) {
+		zea$splitLines.clear();
 	}
 
 	/**

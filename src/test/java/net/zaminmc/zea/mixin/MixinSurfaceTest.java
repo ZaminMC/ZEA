@@ -69,6 +69,8 @@ class MixinSurfaceTest {
 		declaredMethod(ChatComponent.class, "addMessageToQueue", GuiMessage.class);
 		// The bulk rebuild the scroll-stability bracket wraps.
 		declaredMethod(ChatComponent.class, "refreshTrimmedMessages");
+		// Where the chat forgets its messages — and ZEA its wrap memo.
+		declaredMethod(ChatComponent.class, "clearMessages", boolean.class);
 		declaredMethod(ChatComponent.class, "scrollChat", int.class);
 		declaredMethod(ChatComponent.class, "resetChatScroll");
 		declaredMethod(ChatComponent.class, "extractRenderState",
